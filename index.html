@@ -48,7 +48,7 @@ h1{font-size:1.4rem;font-weight:800;color:#2d7dff;}
         <p>Segure o botão abaixo com o mouse e arraste até a barra no topo do Chrome.</p>
         <div class="drag-area">
           <p>⬇ Arraste este botão para a barra de favoritos ⬇</p>
-          <a class="bm" href="javascript:%28function%28%29%7B%0Afetch%28%27https%3A%2F%2Fsandrolimadf1984.github.io%2Fcentral-robos%2Fcentral.js%3Fv%3D%27%2BDate.now%28%29%29%0A.then%28function%28r%29%7Breturn%20r.text%28%29%3B%7D%29%0A.then%28function%28code%29%7Beval%28code%29%3B%7D%29%0A.catch%28function%28e%29%7Balert%28%27Erro%20ao%20carregar%3A%20%27%2Be%29%3B%7D%29%3B%0A%7D%29%28%29%3B">🤖 Robôs</a>
+          <a class="bm" href="javascript:%28function%28%29%7B%0Afetch%28%27https%3A%2F%2Fsandrolimadf1984.github.io%2Fcentral-robos%2Fcentral.js%3Fv%3D%27%2BDate.now%28%29%29%0A.then%28function%28r%29%7Breturn%20r.text%28%29%3B%7D%29%0A.then%28function%28code%29%7B%0A%20%20var%20blob%3Dnew%20Blob%28%5Bcode%5D%2C%7Btype%3A%27application%2Fjavascript%27%7D%29%3B%0A%20%20var%20url%3DURL.createObjectURL%28blob%29%3B%0A%20%20var%20s%3Ddocument.createElement%28%27script%27%29%3B%0A%20%20s.src%3Durl%3B%0A%20%20s.onload%3Dfunction%28%29%7BURL.revokeObjectURL%28url%29%3B%7D%3B%0A%20%20document.head.appendChild%28s%29%3B%0A%7D%29%0A.catch%28function%28e%29%7Balert%28%27Erro%3A%20%27%2Be%29%3B%7D%29%3B%0A%7D%29%28%29%3B">🤖 Robôs</a>
           <div class="hint">🖱️ Clique e segure → arraste para cima até a barra</div>
         </div>
       </div>
