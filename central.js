@@ -5,26 +5,59 @@
     // 2. Criação do painel visual do Menu Central
     const menu = document.createElement('div');
     menu.id = 'menu-central-robos';
+
+    // Fonte vintage (carrega se o portal permitir; senão usa serifada padrão)
+    if (!document.getElementById('fonte-central-robos')) {
+        const fonte = document.createElement('link');
+        fonte.id = 'fonte-central-robos';
+        fonte.rel = 'stylesheet';
+        fonte.href = 'https://fonts.googleapis.com/css2?family=Rye&display=swap';
+        document.head.appendChild(fonte);
+    }
+    // Barra de rolagem dourada
+    if (!document.getElementById('estilo-central-robos')) {
+        const est = document.createElement('style');
+        est.id = 'estilo-central-robos';
+        est.textContent =
+            '#botoes-robos::-webkit-scrollbar{width:12px;}' +
+            '#botoes-robos::-webkit-scrollbar-track{background:#5c0808;border-radius:6px;}' +
+            '#botoes-robos::-webkit-scrollbar-thumb{background:linear-gradient(#e8c874,#c99a3a);border-radius:6px;border:2px solid #5c0808;}';
+        document.head.appendChild(est);
+    }
+
     menu.style.cssText = `
         position: fixed;
         top: 20px;
         left: 20px;
-        width: 320px;
-        background: #1e1e1e;
-        color: #f1f1f1;
-        border-radius: 12px;
-        box-shadow: 0 10px 40px rgba(0,0,0,0.6);
+        width: 340px;
+        padding: 0;
+        background: linear-gradient(180deg, #8a0f0f 0%, #6d0a0a 100%);
+        border: 3px solid #111;
+        border-radius: 6px;
+        box-shadow: 0 12px 45px rgba(0,0,0,0.75);
         z-index: 2147483647;
-        font-family: system-ui, Arial, sans-serif;
-        padding: 20px;
-        border: 2px solid #2d7dff;
+        font-family: 'Rye', 'Rockwell', Georgia, 'Times New Roman', serif;
     `;
-    menu.innerHTML = `
-        <h2 style="margin: 0 0 10px 0; font-size: 18px; text-align: center; color: #2d7dff;">🤖 Central de Automação</h2>
-        <p style="font-size: 13px; text-align: center; color: #aaa; margin-bottom: 20px;">Selecione o robô para iniciar:</p>
-        <div id="botoes-robos" style="display: flex; flex-direction: column; gap: 10px; max-height: 60vh; overflow-y: auto; padding-right: 5px;"></div>
-        <button id="fechar-menu-central" style="margin-top: 20px; width: 100%; padding: 10px; background: #444; color: #fff; border: none; border-radius: 8px; cursor: pointer; font-weight: bold;">❌ Fechar Menu</button>
-    `;
+
+    const cornerSVG = pos => `<svg width="44" height="44" viewBox="0 0 44 44" fill="none" style="position:absolute;${pos};z-index:2;pointer-events:none;">`
+        + `<path d="M4 4 H20 M4 4 V20" stroke="#f5c518" stroke-width="3" stroke-linecap="round"/>`
+        + `<path d="M4 20 Q4 4 20 4" stroke="#f5c518" stroke-width="1.5" fill="none"/>`
+        + `<path d="M12 4 Q30 4 30 22" stroke="#f5c518" stroke-width="1.3" fill="none" opacity="0.7"/>`
+        + `<path d="M4 12 Q4 30 22 30" stroke="#f5c518" stroke-width="1.3" fill="none" opacity="0.7"/>`
+        + `<circle cx="4" cy="4" r="2.6" fill="#f5c518"/></svg>`;
+
+    menu.innerHTML =
+        '<div style="position:absolute;inset:6px;border:2px solid #f5c518;border-radius:3px;pointer-events:none;z-index:0;"></div>'
+        + cornerSVG('top:2px;left:2px;transform:rotate(0deg)')
+        + cornerSVG('top:2px;right:2px;transform:rotate(90deg)')
+        + cornerSVG('bottom:2px;right:2px;transform:rotate(180deg)')
+        + cornerSVG('bottom:2px;left:2px;transform:rotate(270deg)')
+        + '<div style="position:relative;z-index:1;padding:24px 20px 20px;">'
+        +   '<h2 style="margin:4px 0 4px;font-size:22px;text-align:center;color:#ffd633;letter-spacing:1px;text-shadow:2px 2px 0 rgba(0,0,0,0.55),0 0 2px #000;font-weight:700;">CENTRAL DE AUTOMAÇÃO</h2>'
+        +   '<p style="font-size:12px;text-align:center;color:#ffd633;letter-spacing:2px;margin:0 0 18px;">SELECIONE O ROBÔ PARA INICIAR</p>'
+        +   '<div id="botoes-robos" style="display:flex;flex-direction:column;gap:11px;max-height:56vh;overflow-y:auto;padding:4px 8px 4px 4px;"></div>'
+        +   '<button id="fechar-menu-central" style="margin:18px auto 0;display:block;width:72%;padding:10px;background:linear-gradient(180deg,#e23b2e,#b91f16);color:#fff;border:2px solid #fff;border-radius:26px;cursor:pointer;font-weight:800;font-size:14px;font-family:Georgia,serif;box-shadow:0 3px 7px rgba(0,0,0,0.5);">✖ Close</button>'
+        + '</div>';
     document.body.appendChild(menu);
 
     // --- SISTEMA DE AVISOS DINÂMICOS ---
@@ -1419,22 +1452,26 @@
     const container = document.getElementById('botoes-robos');
     for (const [nome, func] of Object.entries(robos)) {
         const btn = document.createElement('button');
-        btn.textContent = `Rodar Robô: ${nome}`;
+        btn.textContent = nome;
+        const fundoBtn = 'linear-gradient(180deg,#ffe27a 0%,#f4c62e 55%,#e9b31f 100%)';
         btn.style.cssText = `
-            padding: 12px;
-            background: #2d7dff;
-            color: white;
-            border: none;
-            border-radius: 8px;
+            padding: 13px 16px;
+            background: ${fundoBtn};
+            color: #7a0e0e;
+            border: 2px solid #d49b1c;
+            border-radius: 28px;
             cursor: pointer;
-            font-weight: bold;
+            font-weight: 800;
             font-size: 14px;
-            transition: all 0.2s ease;
-            margin-bottom: 5px;
+            font-family: Georgia, 'Times New Roman', serif;
+            text-align: center;
+            letter-spacing: .3px;
+            box-shadow: 0 3px 5px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.6);
+            transition: all .15s ease;
         `;
         // Efeito de Hover visual
-        btn.onmouseover = () => btn.style.background = '#1a5bcc';
-        btn.onmouseout = () => btn.style.background = '#2d7dff';
+        btn.onmouseover = () => { btn.style.background = 'linear-gradient(180deg,#fff0a8,#f8d24a)'; btn.style.transform = 'translateY(-1px)'; };
+        btn.onmouseout = () => { btn.style.background = fundoBtn; btn.style.transform = 'none'; };
         
         // Ação ao clicar: Fecha o menu central e roda o código original
         btn.onclick = () => {
