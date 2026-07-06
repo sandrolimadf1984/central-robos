@@ -1303,39 +1303,8 @@
                 }
                 alert("Finalizado! Foram inseridos " + order.length + " códigos únicos na AFFEGO.");
             })();
-        }
-    };
-
-    // 4. Injeta os botões na janela central
-    const container = document.getElementById('botoes-robos');
-    for (const [nome, func] of Object.entries(robos)) {
-        const btn = document.createElement('button');
-        btn.textContent = `Rodar Robô: ${nome}`;
-        btn.style.cssText = `
-            padding: 12px;
-            background: #2d7dff;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            font-size: 14px;
-            transition: all 0.2s ease;
-            margin-bottom: 5px;
-        `;
-        // Efeito de Hover visual
-        btn.onmouseover = () => btn.style.background = '#1a5bcc';
-        btn.onmouseout = () => btn.style.background = '#2d7dff';
-        
-        // Ação ao clicar: Fecha o menu central e roda o código original
-        btn.onclick = () => {
-            menu.remove();
-            func();
-        };
-        container.appendChild(btn);
-    }
-})();
-"MPLAN_10_DIGITOS": () => {
+        },
+        "MPLAN_10_DIGITOS": () => {
         (function () {
             if (document.getElementById('g-painel-mplan10')) return;
             const d = document.createElement('div');
@@ -1444,3 +1413,34 @@
             };
         })();
     },
+    };
+
+    // 4. Injeta os botões na janela central
+    const container = document.getElementById('botoes-robos');
+    for (const [nome, func] of Object.entries(robos)) {
+        const btn = document.createElement('button');
+        btn.textContent = `Rodar Robô: ${nome}`;
+        btn.style.cssText = `
+            padding: 12px;
+            background: #2d7dff;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+            transition: all 0.2s ease;
+            margin-bottom: 5px;
+        `;
+        // Efeito de Hover visual
+        btn.onmouseover = () => btn.style.background = '#1a5bcc';
+        btn.onmouseout = () => btn.style.background = '#2d7dff';
+        
+        // Ação ao clicar: Fecha o menu central e roda o código original
+        btn.onclick = () => {
+            menu.remove();
+            func();
+        };
+        container.appendChild(btn);
+    }
+})();
