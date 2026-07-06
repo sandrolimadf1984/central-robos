@@ -1334,8 +1334,7 @@
         };
         container.appendChild(btn);
     }
-})();
-"MPLAN_10_DIGITOS": () => {
+    "MPLAN_10_DIGITOS": () => {
         (function () {
             if (document.getElementById('g-painel-mplan10')) return;
             const d = document.createElement('div');
@@ -1444,3 +1443,4 @@
             };
         })();
     },
+})();
