@@ -54,7 +54,7 @@
         + cornerSVG('bottom:2px;left:2px;transform:rotate(270deg)')
         + '<div style="position:relative;z-index:1;padding:24px 20px 20px;">'
         +   '<h2 style="margin:4px 0 2px;font-size:22px;text-align:center;color:#ffd633;letter-spacing:1px;text-shadow:2px 2px 0 rgba(0,0,0,0.55),0 0 2px #000;font-weight:700;">CENTRAL DE AUTOMAÇÃO</h2>'
-        +   '<div style="text-align:center;margin:0 0 4px;color:#1a1a1a;font-family:Rockwell,\'Roboto Slab\',Georgia,serif;font-weight:700;line-height:1;"><span style="font-size:16px;letter-spacing:.5px;">CLT</span><span style="font-size:13px;">zinho</span> <span style="font-size:15px;letter-spacing:2px;">DIGITAL</span></div>'
+        +   '<div style="text-align:center;margin:0 0 4px;color:#ffffff;font-family:Rockwell,\'Roboto Slab\',Georgia,serif;font-weight:700;line-height:1;text-shadow:1px 1px 2px rgba(0,0,0,0.55);"><span style="font-size:16px;letter-spacing:.5px;">CLT</span><span style="font-size:13px;">zinho</span> <span style="font-size:15px;letter-spacing:2px;">DIGITAL</span></div>'
         +   '<p style="font-size:12px;text-align:center;color:#ffd633;letter-spacing:2px;margin:0 0 18px;">SELECIONE O ROBÔ PARA INICIAR</p>'
         +   '<div id="botoes-robos" style="display:flex;flex-direction:column;gap:11px;max-height:56vh;overflow-y:auto;padding:4px 8px 4px 4px;"></div>'
         +   '<button id="fechar-menu-central" style="margin:18px auto 0;display:block;width:72%;padding:10px;background:linear-gradient(180deg,#e23b2e,#b91f16);color:#fff;border:2px solid #fff;border-radius:26px;cursor:pointer;font-weight:800;font-size:14px;font-family:Georgia,serif;box-shadow:0 3px 7px rgba(0,0,0,0.5);">✖ Close</button>'
