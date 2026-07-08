@@ -5,74 +5,140 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Central de Automação — Sabin</title>
 <style>
-*{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:'Segoe UI',Arial,sans-serif;background:linear-gradient(135deg,#1e1e2e,#2d2d44);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;}
-.card{background:#1e1e1e;border-radius:20px;box-shadow:0 10px 40px rgba(0,0,0,0.5);max-width:560px;width:100%;overflow:hidden;border:2px solid #2d7dff;}
-.header{background:linear-gradient(135deg,#1a1a2e,#16213e);color:#fff;padding:28px 32px;text-align:center;}
-.icon{font-size:2.8rem;margin-bottom:10px;}
-h1{font-size:1.4rem;font-weight:800;color:#2d7dff;}
-.header p{font-size:0.9rem;opacity:0.7;margin-top:6px;color:#aaa;}
-.body{padding:32px;}
-.step{display:flex;align-items:flex-start;gap:16px;margin-bottom:20px;}
-.num{background:#2d7dff;color:#fff;border-radius:50%;width:32px;height:32px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.95rem;flex-shrink:0;margin-top:2px;}
-.step h3{font-size:1rem;font-weight:700;color:#f1f1f1;margin-bottom:4px;}
-.step p{font-size:0.88rem;color:#aaa;line-height:1.5;}
-.drag-area{background:#2a2a3e;border:2px dashed #2d7dff;border-radius:14px;padding:28px;text-align:center;margin:12px 0 0;}
-.drag-area p{font-size:0.82rem;color:#aaa;margin-bottom:16px;}
-.bm{display:inline-block;background:linear-gradient(135deg,#2d7dff,#1a5bcc);color:#fff!important;padding:14px 28px;border-radius:12px;font-size:1rem;font-weight:700;text-decoration:none!important;cursor:grab;box-shadow:0 4px 16px rgba(45,125,255,0.4);user-select:none;}
-.hint{margin-top:12px;font-size:0.8rem;color:#666;}
-.demo{background:#2a2a3e;border-radius:10px;padding:14px 18px;font-size:0.85rem;color:#aaa;border-left:4px solid #2d7dff;margin-top:12px;line-height:1.6;}
-.demo b{color:#2d7dff;}
-.aviso{background:#2a1a0a;border-radius:10px;padding:12px 16px;font-size:0.82rem;color:#ffa040;border-left:4px solid #ff8c00;margin-top:12px;}
-.divider{height:1px;background:#333;margin:4px 0 20px;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{
+    font-family:'Segoe UI',Roboto,Arial,sans-serif;
+    background:#eef1f6;
+    min-height:100vh;
+    display:flex;align-items:flex-start;justify-content:center;
+    padding:28px 16px;
+    color:#333;
+  }
+  .card{
+    background:#fff;
+    border-radius:18px;
+    box-shadow:0 12px 40px rgba(20,40,80,0.14);
+    max-width:460px;width:100%;
+    overflow:hidden;
+  }
+  /* Cabeçalho azul */
+  .header{
+    background:linear-gradient(150deg,#1c4fb3 0%,#2d7dff 100%);
+    color:#fff;
+    padding:30px 28px 26px;
+    text-align:center;
+  }
+  .header .icon{font-size:2.6rem;line-height:1;margin-bottom:12px;}
+  .header h1{font-size:1.45rem;font-weight:800;letter-spacing:.3px;}
+  .header p{font-size:.9rem;opacity:.85;margin-top:6px;font-weight:500;}
+  /* Corpo */
+  .body{padding:26px 28px 22px;}
+  .step{display:flex;align-items:flex-start;gap:15px;margin-bottom:22px;}
+  .num{
+    flex-shrink:0;
+    width:30px;height:30px;border-radius:50%;
+    background:#2d7dff;color:#fff;
+    display:flex;align-items:center;justify-content:center;
+    font-weight:800;font-size:.95rem;
+    margin-top:1px;
+  }
+  .step-content{flex:1;}
+  .step-content h3{font-size:1.02rem;font-weight:700;color:#1f2937;margin-bottom:4px;}
+  .step-content p{font-size:.9rem;color:#5b6472;line-height:1.55;}
+  .step-content b{color:#1f2937;}
+  /* Área de arrastar */
+  .drag-area{
+    margin-top:14px;
+    background:#f2f7ff;
+    border:2px dashed #2d7dff;
+    border-radius:14px;
+    padding:22px 18px;
+    text-align:center;
+  }
+  .drag-label{font-size:.8rem;color:#7a8699;margin-bottom:15px;font-weight:600;}
+  .bm{
+    display:inline-block;
+    background:linear-gradient(135deg,#2d7dff,#1a5bcc);
+    color:#fff !important;
+    padding:14px 30px;
+    border-radius:12px;
+    font-size:1.05rem;font-weight:800;
+    text-decoration:none !important;
+    cursor:grab;
+    box-shadow:0 6px 18px rgba(45,125,255,0.42);
+    user-select:none;
+    transition:transform .12s ease,box-shadow .12s ease;
+  }
+  .bm:hover{transform:translateY(-1px);box-shadow:0 8px 22px rgba(45,125,255,0.5);}
+  .bm:active{cursor:grabbing;}
+  .hint{margin-top:14px;font-size:.78rem;color:#98a2b3;}
+  /* Caixa "como funciona" */
+  .how{
+    margin-top:14px;
+    background:#eef8f0;
+    border-left:4px solid #28a745;
+    border-radius:10px;
+    padding:14px 16px;
+    font-size:.86rem;color:#3d4a3f;line-height:1.65;
+  }
+  .how-title{display:block;color:#1e7e34;font-weight:800;margin-bottom:5px;}
+  .how b{color:#1e7e34;}
+  .divider{height:1px;background:#e7ebf1;margin:6px 0 18px;}
+  .footer{text-align:center;font-size:.78rem;color:#9aa4b2;}
 </style>
 </head>
 <body>
-<div class="card">
-  <div class="header">
-    <div class="icon">🤖</div>
-    <h1>Central de Automação</h1>
-    <p>Instale em 1 minuto · Sabin Brasília</p>
+  <div class="card">
+    <div class="header">
+      <div class="icon">🤖</div>
+      <h1>Central de Automação</h1>
+      <p>Instale em 1 minuto · Sabin Brasília</p>
+    </div>
+
+    <div class="body">
+      <!-- Passo 1 -->
+      <div class="step">
+        <div class="num">1</div>
+        <div class="step-content">
+          <h3>Mostre a barra de favoritos</h3>
+          <p>Pressione <b>Ctrl + Shift + B</b> no Chrome para exibir a barra de favoritos.</p>
+        </div>
+      </div>
+
+      <!-- Passo 2 -->
+      <div class="step">
+        <div class="num">2</div>
+        <div class="step-content">
+          <h3>Arraste o botão para a barra de favoritos</h3>
+          <p>Segure o botão abaixo com o mouse e arraste até a barra no topo do Chrome.</p>
+          <div class="drag-area">
+            <p class="drag-label">⬇ Arraste este botão para a barra de favoritos ⬇</p>
+            <a class="bm"
+               href="javascript:(function()%7Bfetch('https://raw.githubusercontent.com/sandrolimadf1984/central-robos/main/central.js?v='+Date.now()).then(r=%3E%7Bif(!r.ok)throw new Error('Erro ao carregar!');return r.text()%7D).then(c=%3Eeval(c)).catch(e=%3Ealert(e.message));%7D)();"
+               onclick="alert('👆 Não clique aqui! ARRASTE este botão para a barra de favoritos.'); return false;">🤖 Robôs</a>
+            <p class="hint">🖱️ Clique e segure → arraste para cima até a barra</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Passo 3 -->
+      <div class="step">
+        <div class="num">3</div>
+        <div class="step-content">
+          <h3>Pronto! Clique no favorito para usar</h3>
+          <p>Abra qualquer portal de autorização e clique em <b>🤖 Robôs</b> na barra.</p>
+          <div class="how">
+            <span class="how-title">✅ Como funciona:</span>
+            Clique no favorito → o menu dos robôs abre por cima do portal<br>
+            Escolha o convênio → cole os códigos → pronto!<br>
+            Clique <b>Close</b> para fechar o menu.
+          </div>
+        </div>
+      </div>
+
+      <div class="divider"></div>
+      <div class="footer">Desenvolvido para uso interno · Sabin Brasília</div>
+    </div>
   </div>
-  <div class="body">
-    <div class="step">
-      <div class="num">1</div>
-      <div>
-        <h3>Mostre a barra de favoritos</h3>
-        <p>Pressione <b style="color:#fff">Ctrl + Shift + B</b> no Chrome para exibir a barra de favoritos.</p>
-      </div>
-    </div>
-    <div class="step">
-      <div class="num">2</div>
-      <div style="flex:1">
-        <h3>Arraste o botão para a barra de favoritos</h3>
-        <p>Segure o botão abaixo com o mouse e arraste até a barra no topo do Chrome.</p>
-        <div class="drag-area">
-          <p>⬇ Arraste este botão para a barra de favoritos ⬇</p>
-          <a class="bm" href="javascript:%28function%28%29%7Bvar%20s%3Ddocument.createElement%28%27script%27%29%3Bs.src%3D%27https%3A%2F%2Fsandrolimadf1984.github.io%2Fcentral-robos%2Fcentral.js%3Fv%3D%27%2BDate.now%28%29%3Bdocument.head.appendChild%28s%29%3B%7D%29%28%29%3B">🤖 Robôs</a>
-          <div class="hint">🖱️ Clique e segure → arraste para cima até a barra</div>
-        </div>
-      </div>
-    </div>
-    <div class="step">
-      <div class="num">3</div>
-      <div>
-        <h3>Como usar</h3>
-        <p>Abra qualquer portal de autorização e clique em <b style="color:#fff">🤖 Robôs</b> na barra.</p>
-        <div class="demo">
-          <b>✅ Como funciona:</b><br>
-          Clique no favorito → menu dos robôs abre na tela<br>
-          Selecione o robô → cole os códigos → pronto!<br>
-          Clique <b>Fechar Menu</b> para sair.
-        </div>
-        <div class="aviso">
-          ⚠️ <b>Importante:</b> Use o favorito dentro dos portais de autorização (AMIL, TRE, TJDF, etc). Não funciona no Google.com pois este tem restrições de segurança extras.
-        </div>
-      </div>
-    </div>
-    <div class="divider"></div>
-    <div style="text-align:center;font-size:0.8rem;color:#555;">Desenvolvido para uso interno · Sabin Brasília</div>
-  </div>
-</div>
 </body>
 </html>
