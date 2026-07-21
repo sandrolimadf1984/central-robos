@@ -56,15 +56,83 @@
         +   '<h2 style="margin:4px 0 2px;font-size:22px;text-align:center;color:#ffd633;letter-spacing:1px;text-shadow:2px 2px 0 rgba(0,0,0,0.55),0 0 2px #000;font-weight:700;">CENTRAL DE AUTOMAÇÃO</h2>'
         +   '<div style="text-align:center;margin:0 0 4px;color:#ffffff;font-family:Rockwell,\'Roboto Slab\',Georgia,serif;font-weight:700;line-height:1;text-shadow:1px 1px 2px rgba(0,0,0,0.55);"><span style="font-size:16px;letter-spacing:.5px;">CLT</span><span style="font-size:13px;">zinho</span> <span style="font-size:15px;letter-spacing:2px;">DIGITAL</span></div>'
         +   '<p style="font-size:12px;text-align:center;color:#ffd633;letter-spacing:2px;margin:0 0 18px;">SELECIONE O ROBÔ PARA INICIAR</p>'
-        +   '<div id="botoes-robos" style="display:flex;flex-direction:column;gap:11px;max-height:56vh;overflow-y:auto;padding:4px 8px 4px 4px;"></div>'
-        +   '<button id="fechar-menu-central" style="margin:18px auto 0;display:block;width:72%;padding:10px;background:linear-gradient(180deg,#e23b2e,#b91f16);color:#fff;border:2px solid #fff;border-radius:26px;cursor:pointer;font-weight:800;font-size:14px;font-family:Georgia,serif;box-shadow:0 3px 7px rgba(0,0,0,0.5);">✖ Close</button>'
+        +   '<div id="botoes-robos" style="display:flex;flex-direction:column;gap:11px;max-height:48vh;overflow-y:auto;padding:4px 8px 4px 4px;"></div>'
+        +   '<div style="height:1px;background:rgba(245,197,24,0.45);margin:14px 4px 12px;"></div>'
+        +   '<button id="btn-marcar-checkboxes" style="display:block;width:100%;padding:11px;background:linear-gradient(180deg,#f6a83d,#dd8410);color:#fff;border:2px solid #ffd633;border-radius:26px;cursor:pointer;font-weight:800;font-size:14px;font-family:Georgia,serif;box-shadow:0 3px 6px rgba(0,0,0,0.45);">&#9745; Marcar Checkboxes</button>'
+        +   '<button id="fechar-menu-central" style="margin:10px auto 0;display:block;width:72%;padding:10px;background:linear-gradient(180deg,#e23b2e,#b91f16);color:#fff;border:2px solid #fff;border-radius:26px;cursor:pointer;font-weight:800;font-size:14px;font-family:Georgia,serif;box-shadow:0 3px 7px rgba(0,0,0,0.5);">✖ Close</button>'
+        +   '<div style="text-align:center;margin-top:12px;font-size:11px;color:#e0b84f;font-family:Georgia,serif;letter-spacing:.3px;">Criado por Sandro de Lima Pereira</div>'
         + '</div>';
     document.body.appendChild(menu);
 
+    // --- ARRASTAR O PAINEL PELA TELA ---
+    (() => {
+        let arrastando = false, dx = 0, dy = 0;
+        menu.style.cursor = 'move';
+
+        const mover = ev => {
+            if (!arrastando) return;
+            const p = ev.touches ? ev.touches[0] : ev;
+            const larg = menu.offsetWidth;
+            let x = p.clientX - dx;
+            let y = p.clientY - dy;
+            x = Math.max(100 - larg, Math.min(x, window.innerWidth - 100));
+            y = Math.max(0, Math.min(y, window.innerHeight - 50));
+            menu.style.left = x + 'px';
+            menu.style.top = y + 'px';
+            ev.preventDefault();
+        };
+
+        const parar = () => {
+            arrastando = false;
+            document.body.style.userSelect = '';
+            document.removeEventListener('mousemove', mover);
+            document.removeEventListener('mouseup', parar);
+            document.removeEventListener('touchmove', mover);
+            document.removeEventListener('touchend', parar);
+        };
+
+        const iniciar = ev => {
+            if (ev.target.closest('button, input, textarea, select, a, #botoes-robos')) return;
+            const p = ev.touches ? ev.touches[0] : ev;
+            const r = menu.getBoundingClientRect();
+            menu.style.left = r.left + 'px';
+            menu.style.top = r.top + 'px';
+            menu.style.right = 'auto';
+            menu.style.bottom = 'auto';
+            dx = p.clientX - r.left;
+            dy = p.clientY - r.top;
+            arrastando = true;
+            document.body.style.userSelect = 'none';
+            document.addEventListener('mousemove', mover);
+            document.addEventListener('mouseup', parar);
+            document.addEventListener('touchmove', mover, { passive: false });
+            document.addEventListener('touchend', parar);
+            ev.preventDefault();
+        };
+
+        menu.addEventListener('mousedown', iniciar);
+        menu.addEventListener('touchstart', iniciar, { passive: false });
+    })();
+
+    // --- FUNCIONALIDADE: MARCAR CHECKBOXES ---
+    const btnCheck = document.getElementById('btn-marcar-checkboxes');
+    const fundoCheck = 'linear-gradient(180deg,#f6a83d,#dd8410)';
+    btnCheck.onmouseover = () => btnCheck.style.background = 'linear-gradient(180deg,#ffc266,#eb9520)';
+    btnCheck.onmouseout = () => btnCheck.style.background = fundoCheck;
+    btnCheck.onclick = () => {
+        let marcados = 0;
+        document.querySelectorAll('input[type=checkbox]').forEach(cb => {
+            if (!cb.checked) { cb.click(); marcados++; }
+        });
+        const textoOriginal = '\u2611 Marcar Checkboxes';
+        btnCheck.innerHTML = '\u2705 ' + marcados + ' Marcados!';
+        setTimeout(() => btnCheck.innerHTML = textoOriginal, 2000);
+    };
+
     // --- SISTEMA DE AVISOS DINÂMICOS ---
-    const linkDoAviso = "https://gist.githubusercontent.com/andremarketing68-jpg/63fce593c84ee104119b64c4b3e164a2/raw/aviso.txt";
+    const linkDoAviso = "https://raw.githubusercontent.com/sandrolimadf1984/central-robos/main/aviso.txt";
     fetch(linkDoAviso + "?t=" + new Date().getTime())
-        .then(response => response.text())
+        .then(response => { if (!response.ok) throw new Error('sem aviso'); return response.text(); })
         .then(texto => {
             if (texto.trim() !== "") {
                 const avisoDiv = document.createElement('div');
@@ -85,13 +153,246 @@
     // 3. Dicionário com os scripts ATUALIZADOS
     const robos = {
         "PLANASSISTE MPU": () => {
-            (function(){if(window.__rob)return;window.__rob=true;var u=window.location.href;document.body.innerHTML='';document.head.innerHTML='';var ui=document.createElement('div');ui.style='height:120px;background:#e9ecef;padding:10px;font-family:Arial;box-sizing:border-box;overflow:hidden;border-bottom:3px solid #0056b3;';ui.innerHTML='<h3 style="margin:0 0 5px 0;color:#333;">🤖 Robô Automático (Agrupamento Ativo)</h3><textarea id="rc" placeholder="Cole os códigos (403...)" style="width:300px;height:70px;vertical-align:top;border:1px solid #ccc;padding:5px;"></textarea><button id="rb" style="height:70px;padding:0 20px;margin-left:10px;background:#28a745;color:white;font-weight:bold;border:none;border-radius:5px;cursor:pointer;vertical-align:top;font-size:14px;">INICIAR MÁQUINA</button><button id="rx" style="height:70px;padding:0 20px;margin-left:10px;background:#dc3545;color:white;font-weight:bold;border:none;border-radius:5px;cursor:pointer;vertical-align:top;font-size:14px;">PARAR E FECHAR</button><span id="rs" style="margin-left:15px;font-weight:bold;color:#333;font-size:16px;">Aguardando...</span>';document.body.appendChild(ui);var frm=document.createElement('iframe');frm.id='sf';frm.src=u;frm.style='width:100%;height:calc(100vh - 120px);border:none;';document.body.appendChild(frm);document.body.style.margin='0';document.body.style.overflow='hidden';var q=[],id=0,st='tabela',lp=null;document.getElementById('rx').onclick=function(){clearInterval(lp);window.__rob=false;ui.remove();frm.style.height='100vh';};document.getElementById('rb').onclick=function(){var v=document.getElementById('rc').value.match(/403\d{5}/g);if(!v)return alert('Nenhum código válido.');var cts={};for(var i=0;i<v.length;i++){cts[v[i]]=(cts[v[i]]||0)+1;}q=[];for(var k in cts){q.push({c:k,qty:cts[k]});}id=0;st='tabela';document.getElementById('rs').innerText='Processando '+q.length+' códigos únicos...';this.disabled=true;document.getElementById('rc').disabled=true;lp=setInterval(rl,1500);};function rl(){var d,cw;try{cw=document.getElementById('sf').contentWindow;d=cw.document;}catch(e){return;}if(d.readyState!=='complete')return;if(id>=q.length){clearInterval(lp);document.getElementById('rs').innerText='✅ Concluído! O último código foi salvo e a tela finalizada.';document.getElementById('rs').style.color='#28a745';return;}if(st==='tabela'){var b=d.querySelector('#CODIGOTABELA_btn');if(b){if(!cw._hk){var o=cw.window.open;cw.window.open=function(a,x,c){var w=o.call(cw,a,x,c);var t=setInterval(function(){try{var l=w.document.querySelector('#FormMain > div > div > div > div > div > div > div > div > div.div_grid > table > tbody > tr:nth-child(7) > td:nth-child(1) > a');if(!l){var es=w.document.querySelectorAll('a');for(var i=0;i<es.length;i++){if((es[i].innerText||'').includes('TUSS')){l=es[i];break;}}}if(l){l.click();clearInterval(t);st='preencher';}}catch(e){}},500);return w;};cw._hk=true;b.click();document.getElementById('rs').innerText='Aguardando a tabela TUSS...';}}else{st='preencher';}}else if(st==='preencher'){var f1=d.querySelector('#FormMain > table > tbody > tr:nth-child(1) > td:nth-child(4) > table > tbody > tr > td:nth-child(1) > input.frm_field_lkp');var f2=d.querySelector('#FormMain > table > tbody > tr:nth-child(3) > td:nth-child(2) > table > tbody > tr > td:nth-child(1) > input.frm_field_lkp');var fq=d.querySelector('#FormMain > table > tbody > tr:nth-child(2) > td:nth-child(2) > input');var ult=(id===q.length-1);var sb=ult?'body > table > tbody > tr:nth-child(1) > td > div > table > tbody > tr:nth-child(2) > td > table > tbody > tr > td.StmMain > table > tbody > tr > td > table > tbody > tr > td > table > tbody > tr:nth-child(1) > td > div > div.act_box > div > div > div > div:nth-child(3) > a':'body > table > tbody > tr:nth-child(1) > td > div > table > tbody > tr:nth-child(2) > td > table > tbody > tr > td.StmMain > table > tbody > tr > td > table > tbody > tr > td > table > tbody > tr:nth-child(1) > td > div > div.act_box > div > div > div > div:nth-child(2) > a > nobr';var bt=d.querySelector(sb);if(f1&&f2&&bt){if(cw._wt)return;document.getElementById('rs').innerText=ult?('⏳ Finalizando com: '+q[id].c+' (Qtd: '+q[id].qty+') - Último!'):('⏳ Inserindo: '+q[id].c+' (Qtd: '+q[id].qty+') - '+(id+1)+'/'+q.length);f1.value='';f1.value=q[id].c;f1.dispatchEvent(new Event('input',{bubbles:true}));f1.dispatchEvent(new Event('change',{bubbles:true}));f2.value='';f2.value='Exames-Patologia Clínica';f2.dispatchEvent(new Event('input',{bubbles:true}));f2.dispatchEvent(new Event('change',{bubbles:true}));if(fq&&q[id].qty>1){fq.value='';fq.value=q[id].qty;fq.dispatchEvent(new Event('input',{bubbles:true}));fq.dispatchEvent(new Event('change',{bubbles:true}));}cw._wt=true;setTimeout(function(){bt.click();id++;},800);}else{cw._wt=false;}}}})();
+            (function(){
+                if(window.__rob)return;
+                window.__rob=true;
+                var u=window.location.href;
+                document.body.innerHTML='';
+                document.head.innerHTML='';
+                var ui=document.createElement('div');
+                ui.style='height:120px;background:#e9ecef;padding:10px;font-family:Arial;box-sizing:border-box;overflow:hidden;border-bottom:3px solid #0056b3;';
+                ui.innerHTML='<h3 style="margin:0 0 5px 0;color:#333;">🤖 Robô Automático (Agrupamento Ativo)</h3><textarea id="rc" placeholder="Cole os códigos (8 dígitos...)" style="width:300px;height:70px;vertical-align:top;border:1px solid #ccc;padding:5px;"></textarea><button id="rb" style="height:70px;padding:0 20px;margin-left:10px;background:#28a745;color:white;font-weight:bold;border:none;border-radius:5px;cursor:pointer;vertical-align:top;font-size:14px;">INICIAR MÁQUINA</button><button id="rx" style="height:70px;padding:0 20px;margin-left:10px;background:#dc3545;color:white;font-weight:bold;border:none;border-radius:5px;cursor:pointer;vertical-align:top;font-size:14px;">PARAR E FECHAR</button><span id="rs" style="margin-left:15px;font-weight:bold;color:#333;font-size:16px;">Aguardando...</span>';
+                document.body.appendChild(ui);
+                var frm=document.createElement('iframe');
+                frm.id='sf';frm.src=u;frm.style='width:100%;height:calc(100vh - 120px);border:none;';
+                document.body.appendChild(frm);
+                document.body.style.margin='0';
+                document.body.style.overflow='hidden';
+                var q=[],id=0,st='tabela',lp=null;
+                
+                document.getElementById('rx').onclick=function(){
+                    clearInterval(lp);window.__rob=false;ui.remove();frm.style.height='100vh';
+                };
+                
+                document.getElementById('rb').onclick=function(){
+                    var v=document.getElementById('rc').value.match(/\b\d{8}\b/g);
+                    if(!v)return alert('Nenhum código válido.');
+                    var cts={};
+                    for(var i=0;i<v.length;i++){cts[v[i]]=(cts[v[i]]||0)+1;}
+                    q=[];
+                    for(var k in cts){q.push({c:k,qty:cts[k]});}
+                    id=0;st='tabela';
+                    document.getElementById('rs').innerText='Processando '+q.length+' códigos únicos...';
+                    this.disabled=true;document.getElementById('rc').disabled=true;
+                    lp=setInterval(rl,1500);
+                };
+                
+                function rl(){
+                    var d,cw;
+                    try{cw=document.getElementById('sf').contentWindow;d=cw.document;}catch(e){return;}
+                    if(d.readyState!=='complete')return;
+                    
+                    if(id>=q.length){
+                        clearInterval(lp);
+                        document.getElementById('rs').innerText='✅ Concluído! O último código foi salvo e a tela finalizada.';
+                        document.getElementById('rs').style.color='#28a745';
+                        return;
+                    }
+                    
+                    if(st==='tabela'){
+                        var b=d.querySelector('#CODIGOTABELA_btn');
+                        if(b){
+                            if(!cw._hk){
+                                var o=cw.window.open;
+                                cw.window.open=function(a,x,c){
+                                    var w=o.call(cw,a,x,c);
+                                    var t=setInterval(function(){
+                                        try{
+                                            var l=null;
+                                            var es=w.document.querySelectorAll('a');
+                                            
+                                            for(var i=0;i<es.length;i++){
+                                                var txt=(es[i].innerText||'').toUpperCase();
+                                                if(txt.includes('22 - PROCEDIMENTO') || txt === '22' || txt === '16' || txt.includes('PROCEDIMENTO')){
+                                                    l=es[i];
+                                                    break;
+                                                }
+                                            }
+                                            
+                                            if(!l){
+                                                l=w.document.querySelector('#FormMain > div > div > div > div > div > div > div > div > div.div_grid > table > tbody > tr:nth-child(6) > td:nth-child(1) > a');
+                                            }
+                                            
+                                            if(!l){
+                                                for(var i=0;i<es.length;i++){
+                                                    if((es[i].innerText||'').includes('TUSS')){
+                                                        l=es[i];
+                                                        break;
+                                                    }
+                                                }
+                                            }
+                                            
+                                            if(l){
+                                                l.click();
+                                                clearInterval(t);
+                                                st='preencher';
+                                            }
+                                        }catch(e){}},500);
+                                    return w;
+                                };
+                                cw._hk=true;
+                                b.click();
+                                document.getElementById('rs').innerText='Aguardando a tabela TUSS...';
+                            }
+                        }else{
+                            st='preencher';
+                        }
+                    }else if(st==='preencher'){
+                        var f1=d.querySelector('#FormMain > table > tbody > tr:nth-child(1) > td:nth-child(4) > table > tbody > tr > td:nth-child(1) > input.frm_field_lkp');
+                        var f2=d.querySelector('#FormMain > table > tbody > tr:nth-child(3) > td:nth-child(2) > table > tbody > tr > td:nth-child(1) > input.frm_field_lkp');
+                        var fq=d.querySelector('#FormMain > table > tbody > tr:nth-child(2) > td:nth-child(2) > input');
+                        var ult=(id===q.length-1);
+                        var sb=ult?'body > table > tbody > tr:nth-child(1) > td > div > table > tbody > tr:nth-child(2) > td > table > tbody > tr > td.StmMain > table > tbody > tr > td > table > tbody > tr > td > table > tbody > tr:nth-child(1) > td > div > div.act_box > div > div > div > div:nth-child(3) > a':'body > table > tbody > tr:nth-child(1) > td > div > table > tbody > tr:nth-child(2) > td > table > tbody > tr > td.StmMain > table > tbody > tr > td > table > tbody > tr > td > table > tbody > tr:nth-child(1) > td > div > div.act_box > div > div > div > div:nth-child(2) > a > nobr';
+                        var bt=d.querySelector(sb);
+                        if(f1&&f2&&bt){
+                            if(cw._wt)return;
+                            document.getElementById('rs').innerText=ult?('⏳ Finalizando com: '+q[id].c+' (Qtd: '+q[id].qty+') - Último!'):('⏳ Inserindo: '+q[id].c+' (Qtd: '+q[id].qty+') - '+(id+1)+'/'+q.length);
+                            f1.value='';f1.value=q[id].c;
+                            f1.dispatchEvent(new Event('input',{bubbles:true}));f1.dispatchEvent(new Event('change',{bubbles:true}));
+                            f2.value='';f2.value='Exames-Patologia Clínica';
+                            f2.dispatchEvent(new Event('input',{bubbles:true}));f2.dispatchEvent(new Event('change',{bubbles:true}));
+                            if(fq&&q[id].qty>1){
+                                fq.value='';fq.value=q[id].qty;
+                                fq.dispatchEvent(new Event('input',{bubbles:true}));fq.dispatchEvent(new Event('change',{bubbles:true}));
+                            }
+                            cw._wt=true;
+                            setTimeout(function(){bt.click();id++;},800);
+                        }else{
+                            cw._wt=false;
+                        }
+                    }
+                }
+            })();
+        },
+        "PLENUM": () => {
+            (function () {
+                if (document.getElementById('painel-plenum')) return;
+                const painel = document.createElement('div');
+                painel.id = 'painel-plenum';
+                painel.style.cssText = `
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    width: 300px;
+                    background: #2c3e50;
+                    color: #ecf0f1;
+                    padding: 15px;
+                    border-radius: 8px;
+                    z-index: 2147483647;
+                    font-family: Arial, sans-serif;
+                    box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+                    border: 2px solid #9b59b6;
+                `;
+                painel.innerHTML = `
+                    <h3 style="margin: 0 0 10px 0; color: #9b59b6; text-align: center;">🤖 Lançador PLENUM</h3>
+                    <textarea id="plenum-txt" style="width: 100%; height: 80px; margin-bottom: 10px; border-radius: 4px; padding: 5px; color: #000; box-sizing: border-box;" placeholder="Cole os códigos aqui..."></textarea>
+                    <button id="plenum-btn" style="width: 100%; padding: 10px; background: #27ae60; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; margin-bottom: 5px;">▶ INICIAR (TURBO)</button>
+                    <div id="plenum-status" style="font-size: 12px; color: #bdc3c7; text-align: center; margin-bottom: 5px;">Aguardando...</div>
+                    <button id="plenum-fechar" style="width: 100%; padding: 8px; background: #c0392b; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer;">❌ FECHAR</button>
+                `;
+                document.body.appendChild(painel);
+
+                const wait = ms => new Promise(r => setTimeout(r, ms));
+
+                document.getElementById('plenum-fechar').onclick = () => painel.remove();
+
+                document.getElementById('plenum-btn').onclick = async () => {
+                    const txt = document.getElementById('plenum-txt').value;
+                    let raw = txt.match(/\b\d{8}\b/g);
+                    
+                    if (!raw || raw.length === 0) {
+                        alert("Nenhum código válido encontrado!");
+                        return;
+                    }
+
+                    if (raw.length > 50) {
+                        alert("⚠️ Limite de segurança ativado! Como você colou mais de 50 códigos, o sistema processará apenas os primeiros 50 itens para evitar travamentos.");
+                        raw = raw.slice(0, 50);
+                    }
+
+                    document.getElementById('plenum-btn').disabled = true;
+                    const status = document.getElementById('plenum-status');
+
+                    const counts = {};
+                    raw.forEach(x => counts[x] = (counts[x] || 0) + 1);
+                    const unicos = [...new Set(raw)];
+                    const order = unicos.filter(c => counts[c] === 1).concat(unicos.filter(c => counts[c] > 1));
+                    const codigos = order.map(k => ({ cod: k, qtd: counts[k] }));
+
+                    const setVal = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+
+                    for (let i = 0; i < codigos.length; i++) {
+                        let item = codigos[i];
+                        status.innerText = `⚡ Processando ${i + 1}/${codigos.length}: ${item.cod} (Qtd: ${item.qtd})`;
+
+                        let inptCod = document.querySelector('#codProc');
+                        if (inptCod) {
+                            inptCod.focus();
+                            if (setVal) setVal.call(inptCod, item.cod);
+                            else inptCod.value = item.cod;
+                            
+                            inptCod.dispatchEvent(new Event('input', { bubbles: true }));
+                            inptCod.dispatchEvent(new Event('change', { bubbles: true }));
+                            await wait(50); 
+                        }
+
+                        let btnAlteraQtd = document.querySelector('#formContainer > div:nth-child(2) > div:nth-child(2) > div.col-xs-2.col-md-2 > div > div > input.btn.btn-primary');
+                        if (btnAlteraQtd) {
+                            btnAlteraQtd.focus();
+                            btnAlteraQtd.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                            btnAlteraQtd.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                            btnAlteraQtd.click();
+                            await wait(300); 
+                        }
+
+                        let inptQtd = document.querySelector('#qtde');
+                        if (inptQtd) {
+                            inptQtd.focus();
+                            if (setVal) setVal.call(inptQtd, item.qtd);
+                            else inptQtd.value = item.qtd;
+                            
+                            inptQtd.dispatchEvent(new Event('input', { bubbles: true }));
+                            inptQtd.dispatchEvent(new Event('change', { bubbles: true }));
+                            await wait(50); 
+                        }
+
+                        let inptDesc = document.querySelector('#descProc');
+                        if (inptDesc) {
+                            inptDesc.focus();
+                            inptDesc.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                            inptDesc.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                            inptDesc.click();
+                            await wait(350); 
+                        }
+
+                        let btnIncluir = document.querySelector('#btnIncluiProc');
+                        if (btnIncluir) {
+                            btnIncluir.click();
+                            await wait(400); 
+                        }
+                    }
+
+                    status.innerText = "✅ Finalizado!";
+                    document.getElementById('plenum-btn').disabled = false;
+                    alert("Todos os códigos foram processados com sucesso no modo Turbo!");
+                };
+            })();
         },
         "TRE": () => {
             (async function () {
                 const inputStr = prompt("Cole os códigos de 8 dígitos:");
                 if (!inputStr) return;
-                const rawCodes = inputStr.match(/403\d{5}/g);
+                const rawCodes = inputStr.match(/\b\d{8}\b/g);
                 if (!rawCodes || rawCodes.length === 0) {
                     alert("Nenhum código válido encontrado.");
                     return;
@@ -327,13 +628,13 @@
                     painel = document.createElement('div');
                     painel.id = 'b403-painel-root';
                     painel.style = 'position:fixed;bottom:20px;right:20px;z-index:999999;background:#1e1e1e;color:#f1f1f1;font-family:system-ui,Arial;padding:14px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);width:260px;';
-                    painel.innerHTML = '<div style="font-weight:600;margin-bottom:8px;">⚙️ Automação 403</div><textarea id="b403-input" placeholder="Cole os códigos aqui..." style="width:100%;height:80px;border-radius:6px;border:none;padding:6px;margin-bottom:8px;"></textarea><button id="b403-iniciar" style="width:100%;padding:8px;border:none;border-radius:8px;background:#2d7dff;color:#fff;cursor:pointer;">▶️ Iniciar</button>';
+                    painel.innerHTML = '<div style="font-weight:600;margin-bottom:8px;">⚙️ Automação de Códigos</div><textarea id="b403-input" placeholder="Cole os códigos (8 dígitos) aqui..." style="width:100%;height:80px;border-radius:6px;border:none;padding:6px;margin-bottom:8px;"></textarea><button id="b403-iniciar" style="width:100%;padding:8px;border:none;border-radius:8px;background:#2d7dff;color:#fff;cursor:pointer;">▶️ Iniciar</button>';
                     document.body.appendChild(painel);
                     painel.querySelector('#b403-iniciar').onclick = iniciarAutomacao;
                 };
                 const iniciarAutomacao = () => {
                     const texto = painel.querySelector('#b403-input').value || '';
-                    const matches = texto.match(/403\d{5}/g) || [];
+                    const matches = texto.match(/\b\d{8}\b/g) || [];
                     if (!matches.length) {
                         alert('Nenhum código válido.');
                         return;
@@ -343,7 +644,7 @@
                     const unicos = [...new Set(matches)];
                     const order = unicos.filter(c => contagem[c] === 1).concat(unicos.filter(c => contagem[c] > 1));
                     codigos = order.map(k => ({ cod: k, qtd: contagem[k] }));
-                    painel.innerHTML = '<div style="font-weight:600;margin-bottom:10px;">⚙️ Automação 403</div><div id="b403-status">Status: iniciado</div><div id="b403-contador">0 / ' + codigos.length + '</div><div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px;"><button id="b403-pausar">⏸ Pausar</button><button id="b403-pular">⏭ Pular</button><button id="b403-encerrar" style="grid-column:1/3;">❌ Encerrar</button></div>';
+                    painel.innerHTML = '<div style="font-weight:600;margin-bottom:10px;">⚙️ Automação de Códigos</div><div id="b403-status">Status: iniciado</div><div id="b403-contador">0 / ' + codigos.length + '</div><div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px;"><button id="b403-pausar">⏸ Pausar</button><button id="b403-pular">⏭ Pular</button><button id="b403-encerrar" style="grid-column:1/3;">❌ Encerrar</button></div>';
                     statusEl = painel.querySelector('#b403-status');
                     contadorEl = painel.querySelector('#b403-contador');
                     painel.querySelector('#b403-pausar').onclick = togglePause;
@@ -477,9 +778,9 @@
             (function () {
                 if (window._b403) return;
                 window._b403 = 1;
-                let t = prompt("Cole os códigos 403:");
+                let t = prompt("Cole os códigos de 8 dígitos:");
                 if (!t) { window._b403 = 0; return; }
-                let m = t.match(/403\d{5}/g) || [];
+                let m = t.match(/\b\d{8}\b/g) || [];
                 if (!m.length) { window._b403 = 0; return; }
                 let counts = {};
                 m.forEach(x => counts[x] = (counts[x] || 0) + 1);
@@ -536,7 +837,7 @@
                 const TEMPO = 150;
                 var texto = prompt("MODO SONIC: Cole os códigos aqui:");
                 if (!texto) return;
-                var raw = texto.match(/\b403\d{5}\b/g);
+                var raw = texto.match(/\b\d{8}\b/g);
                 if (!raw || raw.length === 0) return;
                 var counts = {};
                 raw.forEach(x => counts[x] = (counts[x] || 0) + 1);
@@ -581,7 +882,7 @@
                 b.style = "position:fixed;top:10px;left:50%;transform:translateX(-50%);padding:15px;background:#008b8b;color:white;font-weight:bold;border:3px solid white;z-index:9999999;box-shadow:0 0 20px #000;cursor:pointer;border-radius:8px;font-family:monospace;font-size:14px;";
                 b.onclick = function () {
                     var w = window.open("", "RoboSafe", "width=400,height=600");
-                    var h = `<html><head><title>Robô Equilibrado</title><style>body{background:#111;color:#fff;font-family:sans-serif;padding:10px}textarea{width:100%;height:150px;background:#222;color:#0f0;border:1px solid #555;font-family:monospace}button{width:100%;padding:10px;margin-top:10px;cursor:pointer;font-weight:bold}.g{background:#0d0;color:#000}.r{background:#f33;color:#fff}#l{margin-top:10px;height:300px;overflow-y:auto;background:#000;border:1px solid #444;font-family:monospace;font-size:11px;padding:5px}</style></head><body><h3>⚖️ Robô TUSS (Estável)</h3><p>Cole a lista:</p><textarea id="t"></textarea><button class="g" onclick="go()">▶ INICIAR</button><button class="r" onclick="stop()">⏹ PARAR</button><div id="l"></div> <script> var r=false,idx=0,lst=[],win=window.opener; function log(m){ var d=document.createElement("div"); d.innerText="["+new Date().toLocaleTimeString()+"] "+m; document.getElementById("l").prepend(d) } function stop(){r=false;log("PARADO.")} function go(){ var v=document.getElementById("t").value; var raw=v.match(/403\\d{5}/g); if(!raw)return alert("Sem códigos!"); var counts={}; raw.forEach(x=>counts[x]=(counts[x]||0)+1); var unicos=[...new Set(raw)]; var order=unicos.filter(c=>counts[c]===1).concat(unicos.filter(c=>counts[c]>1)); lst=order.map(k=>({cod:k,qtd:counts[k]})); if(!win||win.closed)return alert("Janela principal fechada!"); r=true;idx=0;log("Iniciando "+lst.length+" itens...");loop() } async function waitEl(sel,timeout=5000){ var t=0; while(t<timeout){ if(!r)throw new Error("Parado"); var el=win.document.querySelector(sel); if(el&&el.offsetParent!==null)return el; await new Promise(x=>setTimeout(x,200)); t+=200 } throw new Error("Timeout: "+sel) } async function pause(ms){await new Promise(x=>setTimeout(x,ms))} async function loop(){ if(!r)return; if(idx>=lst.length){r=false;return alert("FIM!")} var item=lst[idx],c=item.cod,q=item.qtd; log("Item "+(idx+1)+": "+c+(q>1?" (Qtd: "+q+")":"")); try{ log("Aguardando botão..."); await waitEl("input[value='Adicionar Procedimento']",10000); await pause(500); var b1=win.document.querySelector("input[value='Adicionar Procedimento']")||win.document.querySelector("input[name='adicionarProcedimento']"); b1.click(); var fixo=await waitEl("#noreset_txCodTabela"); await pause(500); fixo.value="16"; fixo.dispatchEvent(new win.Event('change',{bubbles:true})); fixo.dispatchEvent(new win.Event('blur',{bubbles:true})); try{win.$(fixo).trigger('change')}catch(e){} var inp=await waitEl("#codItemProcedimento"); await pause(300); inp.value=c; inp.dispatchEvent(new win.Event('change',{bubbles:true})); inp.dispatchEvent(new win.Event('blur',{bubbles:true})); var qtd=win.document.getElementById("procedimento.numQtdSolicitada"); if(qtd){ qtd.value=q; qtd.dispatchEvent(new win.Event('input',{bubbles:true})); qtd.dispatchEvent(new win.Event('change',{bubbles:true})); } await pause(500); var b2=await waitEl(".ui-dialog-buttonpane button:nth-child(2)"); if(!b2.innerText.includes("Salvar")&&!b2.innerText.includes("Confirmar")){ var bs=win.document.querySelectorAll("button"); for(var b of bs)if(b.innerText.includes("Salvar"))b2=b } b2.click(); log("Salvo! Aguardando..."); idx++; await pause(1500); loop() }catch(e){ log("ERRO: "+e.message); r=false; alert("Erro: "+e.message) } } <\/script></body></html>`;
+                    var h = `<html><head><title>Robô Equilibrado</title><style>body{background:#111;color:#fff;font-family:sans-serif;padding:10px}textarea{width:100%;height:150px;background:#222;color:#0f0;border:1px solid #555;font-family:monospace}button{width:100%;padding:10px;margin-top:10px;cursor:pointer;font-weight:bold}.g{background:#0d0;color:#000}.r{background:#f33;color:#fff}#l{margin-top:10px;height:300px;overflow-y:auto;background:#000;border:1px solid #444;font-family:monospace;font-size:11px;padding:5px}</style></head><body><h3>⚖️ Robô TUSS (Estável)</h3><p>Cole a lista (8 dígitos):</p><textarea id="t"></textarea><button class="g" onclick="go()">▶ INICIAR</button><button class="r" onclick="stop()">⏹ PARAR</button><div id="l"></div> <script> var r=false,idx=0,lst=[],win=window.opener; function log(m){ var d=document.createElement("div"); d.innerText="["+new Date().toLocaleTimeString()+"] "+m; document.getElementById("l").prepend(d) } function stop(){r=false;log("PARADO.")} function go(){ var v=document.getElementById("t").value; var raw=v.match(/\\b\\d{8}\\b/g); if(!raw)return alert("Sem códigos!"); var counts={}; raw.forEach(x=>counts[x]=(counts[x]||0)+1); var unicos=[...new Set(raw)]; var order=unicos.filter(c=>counts[c]===1).concat(unicos.filter(c=>counts[c]>1)); lst=order.map(k=>({cod:k,qtd:counts[k]})); if(!win||win.closed)return alert("Janela principal fechada!"); r=true;idx=0;log("Iniciando "+lst.length+" itens...");loop() } async function waitEl(sel,timeout=5000){ var t=0; while(t<timeout){ if(!r)throw new Error("Parado"); var el=win.document.querySelector(sel); if(el&&el.offsetParent!==null)return el; await new Promise(x=>setTimeout(x,200)); t+=200 } throw new Error("Timeout: "+sel) } async function pause(ms){await new Promise(x=>setTimeout(x,ms))} async function loop(){ if(!r)return; if(idx>=lst.length){r=false;return alert("FIM!")} var item=lst[idx],c=item.cod,q=item.qtd; log("Item "+(idx+1)+": "+c+(q>1?" (Qtd: "+q+")":"")); try{ log("Aguardando botão..."); await waitEl("input[value='Adicionar Procedimento']",10000); await pause(500); var b1=win.document.querySelector("input[value='Adicionar Procedimento']")||win.document.querySelector("input[name='adicionarProcedimento']"); b1.click(); var fixo=await waitEl("#noreset_txCodTabela"); await pause(500); fixo.value="16"; fixo.dispatchEvent(new win.Event('change',{bubbles:true})); fixo.dispatchEvent(new win.Event('blur',{bubbles:true})); try{win.$(fixo).trigger('change')}catch(e){} var inp=await waitEl("#codItemProcedimento"); await pause(300); inp.value=c; inp.dispatchEvent(new win.Event('change',{bubbles:true})); inp.dispatchEvent(new win.Event('blur',{bubbles:true})); var qtd=win.document.getElementById("procedimento.numQtdSolicitada"); if(qtd){ qtd.value=q; qtd.dispatchEvent(new win.Event('input',{bubbles:true})); qtd.dispatchEvent(new win.Event('change',{bubbles:true})); } await pause(500); var b2=await waitEl(".ui-dialog-buttonpane button:nth-child(2)"); if(!b2.innerText.includes("Salvar")&&!b2.innerText.includes("Confirmar")){ var bs=win.document.querySelectorAll("button"); for(var b of bs)if(b.innerText.includes("Salvar"))b2=b } b2.click(); log("Salvo! Aguardando..."); idx++; await pause(1500); loop() }catch(e){ log("ERRO: "+e.message); r=false; alert("Erro: "+e.message) } } <\/script></body></html>`;
                     w.document.write(h);
                     this.remove()
                 };
@@ -590,9 +891,9 @@
         },
         "POSTAL": () => {
             (function () {
-                var l = prompt("Cole os códigos 403:");
+                var l = prompt("Cole os códigos de 8 dígitos:");
                 if (!l) return;
-                var raw = l.match(/403\d{5}/g);
+                var raw = l.match(/\b\d{8}\b/g);
                 if (!raw) return alert("Sem códigos!");
                 var counts = {};
                 raw.forEach(x => counts[x] = (counts[x] || 0) + 1);
@@ -664,16 +965,16 @@
             (function () {
                 var d = document.createElement('div');
                 d.style.cssText = 'position:fixed;top:10px;right:10px;width:300px;background:#fff;border:3px solid #d63384;padding:10px;z-index:999999;font-family:Arial;box-shadow:0 0 15px rgba(0,0,0,0.5)';
-                d.innerHTML = '<h3 style="margin:0;color:#d63384">Lançador Amil (Rápido)</h3><p style="font-size:12px;margin:5px 0">Cola > Checa rápido o nome > Salva.</p><textarea id="tc" style="width:100%;height:100px" placeholder="Cole os códigos 403..."></textarea><button id="bi" style="margin-top:5px;width:100%;padding:10px;background:#28a745;color:white;cursor:pointer;font-weight:bold;border:none">INICIAR</button><button onclick="this.parentElement.remove()" style="margin-top:5px;width:100%;cursor:pointer">FECHAR</button><div id="lg" style="font-size:11px;margin-top:5px;color:red;font-weight:bold"></div>';
+                d.innerHTML = '<h3 style="margin:0;color:#d63384">Lançador Amil (Rápido)</h3><p style="font-size:12px;margin:5px 0">Cola > Checa rápido o nome > Salva.</p><textarea id="tc" style="width:100%;height:100px" placeholder="Cole os códigos de 8 dígitos..."></textarea><button id="bi" style="margin-top:5px;width:100%;padding:10px;background:#28a745;color:white;cursor:pointer;font-weight:bold;border:none">INICIAR</button><button onclick="this.parentElement.remove()" style="margin-top:5px;width:100%;cursor:pointer">FECHAR</button><div id="lg" style="font-size:11px;margin-top:5px;color:red;font-weight:bold"></div>';
                 document.body.appendChild(d);
                 
                 document.getElementById('bi').onclick = async () => {
                     var t = document.getElementById('tc').value;
-                    var raw = t.match(/403\d{5}/g);
+                    var raw = t.match(/\b\d{8}\b/g);
                     var log = document.getElementById('lg');
                     
                     if (!raw || raw.length == 0) {
-                        alert('Nenhum código 403 encontrado!');
+                        alert('Nenhum código de 8 dígitos encontrado!');
                         return;
                     }
                     
@@ -771,7 +1072,7 @@
                 div.innerHTML = `
                     <h3>🚀 Auto Preenchimento INAS</h3>
                     <span class="count-tag" id="g-count">Únicos: 0 | Total: 0</span>
-                    <textarea id="g-codes" placeholder="Cole os códigos aqui..."></textarea>
+                    <textarea id="g-codes" placeholder="Cole os códigos de 8 dígitos aqui..."></textarea>
                     <div style="display:flex; gap:5px;">
                         <button id="g-start" style="background:#2ecc71;">▶ Iniciar</button>
                         <button id="g-stop" style="background:#e74c3c; display:none;">⏹ Parar</button>
@@ -800,7 +1101,7 @@
                 };
                 
                 const getCodes = () => {
-                    const matches = [...txt.value.matchAll(/403\d{5}/g)].map(m => m[0]);
+                    const matches = [...txt.value.matchAll(/\b\d{8}\b/g)].map(m => m[0]);
                     const counts = {};
                     for (const code of matches) { counts[code] = (counts[code] || 0) + 1; }
                     const unicos = [...new Set(matches)];
@@ -956,7 +1257,7 @@
                     status.innerText = '🔍 Conferindo tabela e quantidades...';
                     await wait(1000);
                     let allTables = Array.from(document.querySelectorAll('table'));
-                    let table = allTables.find(t => t.innerText.includes('403') || t.offsetParent !== null);
+                    let table = allTables.find(t => (codes.length > 0 && t.innerText.includes(codes[0].code)) || t.offsetParent !== null);
                     let missing = [];
                     if (table) {
                         let rows = Array.from(table.querySelectorAll('tbody tr'));
@@ -982,7 +1283,7 @@
                     }
                     if (!isRunning) return;
                     allTables = Array.from(document.querySelectorAll('table'));
-                    table = allTables.find(t => t.innerText.includes('403') || t.offsetParent !== null);
+                    table = allTables.find(t => (codes.length > 0 && t.innerText.includes(codes[0].code)) || t.offsetParent !== null);
                     let tableText = table ? table.innerText : '';
                     missing = codes.filter(c => !tableText.includes(c.code));
                     if (missing.length > 0) {
@@ -1000,9 +1301,9 @@
         },
         "TRF": () => {
             (function () {
-                var l = prompt("Cole os códigos 403:");
+                var l = prompt("Cole os códigos de 8 dígitos:");
                 if (!l) return;
-                var cods = l.match(/403\d{5}/g);
+                var cods = l.match(/\b\d{8}\b/g);
                 if (!cods) return alert("Nenhum código!");
                 var counts = {};
                 cods.forEach(function (c) {
@@ -1237,9 +1538,9 @@
         },
         "AFFEGO": () => {
             (async function () {
-                var l = prompt("Cole os códigos aqui:");
+                var l = prompt("Cole os códigos de 8 dígitos aqui:");
                 if (!l) return;
-                var raw = l.match(/403\d{5}/g) || l.match(/\b\d{8}\b/g);
+                var raw = l.match(/\b\d{8}\b/g);
                 if (!raw) return alert("Sem códigos!");
                 var counts = {};
                 raw.forEach(x => counts[x] = (counts[x] || 0) + 1);
