@@ -19,8 +19,17 @@
             '#cr-home::-webkit-scrollbar,#cr-janela::-webkit-scrollbar{width:8px;}' +
             '#cr-home::-webkit-scrollbar-track,#cr-janela::-webkit-scrollbar-track{background:#0a1020;}' +
             '#cr-home::-webkit-scrollbar-thumb,#cr-janela::-webkit-scrollbar-thumb{background:#2d7dff;border-radius:4px;}' +
-            '.cr-resize{position:absolute;left:0;right:0;height:8px;cursor:ns-resize;z-index:5;}' +
-            '.cr-resize:hover{background:rgba(45,125,255,0.35);}';
+            '.cr-rz{position:absolute;z-index:20;}' +
+            '.cr-rz-n{top:0;left:9px;right:9px;height:9px;cursor:ns-resize;}' +
+            '.cr-rz-s{bottom:0;left:9px;right:9px;height:9px;cursor:ns-resize;}' +
+            '.cr-rz-w{left:0;top:9px;bottom:9px;width:9px;cursor:ew-resize;}' +
+            '.cr-rz-e{right:0;top:9px;bottom:9px;width:9px;cursor:ew-resize;}' +
+            '.cr-rz-nw{top:0;left:0;width:14px;height:14px;cursor:nwse-resize;z-index:21;}' +
+            '.cr-rz-se{bottom:0;right:0;width:14px;height:14px;cursor:nwse-resize;z-index:21;}' +
+            '.cr-rz-ne{top:0;right:0;width:14px;height:14px;cursor:nesw-resize;z-index:21;}' +
+            '.cr-rz-sw{bottom:0;left:0;width:14px;height:14px;cursor:nesw-resize;z-index:21;}' +
+            '.cr-rz:hover{background:rgba(45,125,255,0.30);border-radius:4px;}' +
+            '.cr-arrasta{cursor:move;}';
         document.head.appendChild(est);
     }
 
@@ -43,16 +52,18 @@
         overflow: hidden;
         display: flex;
         flex-direction: column;
+        padding: 7px;
+        box-sizing: border-box;
     `;
 
     // ── TELA 1: menu principal ────────────────────────────────────
     const telaHome = document.createElement('div');
     telaHome.id = 'cr-home';
-    telaHome.style.cssText = 'position:relative;padding:14px 16px 12px;flex:1;min-height:0;overflow-y:auto;';
+    telaHome.style.cssText = 'position:relative;padding:8px 9px 6px 10px;flex:1;min-height:0;overflow-y:auto;cursor:default;border-radius:10px;';
     telaHome.innerHTML = `
         <div style="position:absolute;top:8px;right:14px;font-size:8.5px;letter-spacing:1px;color:#f5c518;text-shadow:0 0 6px rgba(245,197,24,0.45);font-weight:700;">CRIADO POR SANDRO DE LIMA PEREIRA</div>
 
-        <div style="display:flex;align-items:center;gap:12px;margin-top:10px;">
+        <div class="cr-arrasta" style="display:flex;align-items:center;gap:12px;margin-top:10px;">
             <div style="font-size:36px;line-height:1;filter:drop-shadow(0 0 8px rgba(77,195,255,0.6));">🤖</div>
             <div style="flex:1;">
                 <div style="font-size:15px;font-weight:700;color:#e8f1ff;letter-spacing:2px;line-height:1.1;">CENTRAL DE</div>
@@ -63,7 +74,7 @@
             </div>
         </div>
 
-        <div style="text-align:center;margin:6px 0 12px;font-size:12px;letter-spacing:3px;color:#9db4d8;font-weight:600;">
+        <div class="cr-arrasta" style="text-align:center;margin:6px 0 12px;font-size:12px;letter-spacing:3px;color:#9db4d8;font-weight:600;">
             <span style="color:#3d5a85;">—</span>&nbsp; <b style="color:#cfe0ff;">CLT</b>zinho&nbsp;<span style="letter-spacing:4px;">DIGITAL</span> &nbsp;<span style="color:#3d5a85;">—</span>
         </div>
 
@@ -111,7 +122,7 @@
             </svg>
         </div>
 
-        <div id="cr-lista" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;max-height:44vh;overflow-y:auto;padding-right:6px;"></div>
+        <div id="cr-lista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;overflow-y:auto;padding-right:4px;"></div>
 
         <div style="display:flex;align-items:flex-start;justify-content:center;gap:56px;margin:16px 0 6px;">
             <div id="cr-fechar-app" style="text-align:center;cursor:pointer;">
@@ -130,7 +141,7 @@
     // ── TELA 2: janela de códigos (uma para todos os robôs) ───────
     const telaJanela = document.createElement('div');
     telaJanela.id = 'cr-janela';
-    telaJanela.style.cssText = 'display:none;position:relative;padding:14px 16px 14px;flex:1;min-height:0;overflow-y:auto;';
+    telaJanela.style.cssText = 'display:none;position:relative;padding:8px 9px 8px 10px;flex:1;min-height:0;overflow-y:auto;cursor:default;border-radius:10px;';
     telaJanela.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
             <div id="cr-voltar" style="width:34px;height:34px;border-radius:50%;background:#0e1a2e;border:1px solid #223a5e;display:flex;align-items:center;justify-content:center;font-size:16px;color:#cfe0ff;cursor:pointer;flex-shrink:0;">←</div>
@@ -166,49 +177,65 @@
     menu.appendChild(telaJanela);
     document.body.appendChild(menu);
 
-    // ── ALÇAS DE REDIMENSIONAR (bordas superior e inferior) ───────
-    const alcaTopo = document.createElement('div');
-    alcaTopo.className = 'cr-resize';
-    alcaTopo.style.top = '0';
-    const alcaBase = document.createElement('div');
-    alcaBase.className = 'cr-resize';
-    alcaBase.style.bottom = '0';
-    menu.appendChild(alcaTopo);
-    menu.appendChild(alcaBase);
+    // ── ALÇAS DE REDIMENSIONAR (8 extremidades, igual janela do Chrome) ─
+    const ALTURA_MIN = 200, LARGURA_MIN = 260;
+    ['n','s','w','e','nw','ne','sw','se'].forEach(dir => {
+        const alca = document.createElement('div');
+        alca.className = 'cr-rz cr-rz-' + dir;
+        alca.dataset.dir = dir;
+        menu.appendChild(alca);
+    });
 
-    const ALTURA_MIN = 200;
     (() => {
-        let ativo = null, y0 = 0, alt0 = 0, top0 = 0;
+        let dir = null, x0 = 0, y0 = 0, larg0 = 0, alt0 = 0, top0 = 0, esq0 = 0;
+
         const mover = ev => {
-            if (!ativo) return;
+            if (!dir) return;
             const p = ev.touches ? ev.touches[0] : ev;
-            const d = p.clientY - y0;
-            if (ativo === 'base') {
-                let h = Math.max(ALTURA_MIN, Math.min(alt0 + d, window.innerHeight - top0 - 8));
+            const dx = p.clientX - x0, dy = p.clientY - y0;
+
+            if (dir.includes('s')) {
+                const h = Math.max(ALTURA_MIN, Math.min(alt0 + dy, window.innerHeight - top0 - 4));
                 menu.style.height = h + 'px';
-            } else {
-                let h = Math.max(ALTURA_MIN, Math.min(alt0 - d, top0 + alt0 - 8));
+            }
+            if (dir.includes('n')) {
+                const h = Math.max(ALTURA_MIN, Math.min(alt0 - dy, top0 + alt0 - 4));
                 menu.style.height = h + 'px';
                 menu.style.top = (top0 + alt0 - h) + 'px';
             }
+            if (dir.includes('e')) {
+                const w = Math.max(LARGURA_MIN, Math.min(larg0 + dx, window.innerWidth - esq0 - 4));
+                menu.style.width = w + 'px';
+            }
+            if (dir.includes('w')) {
+                const w = Math.max(LARGURA_MIN, Math.min(larg0 - dx, esq0 + larg0 - 4));
+                menu.style.width = w + 'px';
+                menu.style.left = (esq0 + larg0 - w) + 'px';
+            }
             ev.preventDefault();
         };
+
         const parar = () => {
-            ativo = null;
+            dir = null;
             document.body.style.userSelect = '';
             document.removeEventListener('mousemove', mover);
             document.removeEventListener('mouseup', parar);
             document.removeEventListener('touchmove', mover);
             document.removeEventListener('touchend', parar);
         };
-        const iniciar = qual => ev => {
+
+        const iniciar = ev => {
+            const alca = ev.target.closest('.cr-rz');
+            if (!alca) return;
             const p = ev.touches ? ev.touches[0] : ev;
             const r = menu.getBoundingClientRect();
             menu.style.left = r.left + 'px';
             menu.style.top = r.top + 'px';
             menu.style.right = 'auto';
             menu.style.bottom = 'auto';
-            ativo = qual; y0 = p.clientY; alt0 = r.height; top0 = r.top;
+            dir = alca.dataset.dir;
+            x0 = p.clientX; y0 = p.clientY;
+            larg0 = r.width; alt0 = r.height; top0 = r.top; esq0 = r.left;
             document.body.style.userSelect = 'none';
             document.addEventListener('mousemove', mover);
             document.addEventListener('mouseup', parar);
@@ -217,10 +244,9 @@
             ev.preventDefault();
             ev.stopPropagation();
         };
-        alcaTopo.addEventListener('mousedown', iniciar('topo'));
-        alcaBase.addEventListener('mousedown', iniciar('base'));
-        alcaTopo.addEventListener('touchstart', iniciar('topo'), { passive: false });
-        alcaBase.addEventListener('touchstart', iniciar('base'), { passive: false });
+
+        menu.addEventListener('mousedown', iniciar, true);
+        menu.addEventListener('touchstart', iniciar, { passive: false, capture: true });
     })();
 
     // ── ARRASTAR O PAINEL PELA TELA ───────────────────────────────
@@ -248,7 +274,7 @@
         };
         const iniciar = ev => {
             const alvo = ev.target;
-            if (alvo.closest('button, textarea, input, select, a, .cr-card, .cr-resize, #cr-fechar-app, #cr-marcador, #cr-voltar, #cr-j-fechar, #cr-lista')) return;
+            if (alvo.closest('button, textarea, input, select, a, .cr-card, .cr-rz, #cr-fechar-app, #cr-marcador, #cr-voltar, #cr-j-fechar, #cr-lista')) return;
             // clique em cima de barra de rolagem: deixa o navegador cuidar
             if (alvo.nodeType === 1 && (ev.offsetX > alvo.clientWidth || ev.offsetY > alvo.clientHeight)) return;
             const p = ev.touches ? ev.touches[0] : ev;
