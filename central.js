@@ -42,7 +42,7 @@
     telaHome.id = 'cr-home';
     telaHome.style.cssText = 'position:relative;padding:14px 16px 12px;';
     telaHome.innerHTML = `
-        <div style="position:absolute;top:8px;right:14px;font-size:8.5px;letter-spacing:1px;color:#4dc3ff;font-weight:700;">CRIADO POR SANDRO DE LIMA PEREIRA</div>
+        <div style="position:absolute;top:8px;right:14px;font-size:8.5px;letter-spacing:1px;color:#f5c518;text-shadow:0 0 6px rgba(245,197,24,0.45);font-weight:700;">CRIADO POR SANDRO DE LIMA PEREIRA</div>
 
         <div style="display:flex;align-items:center;gap:12px;margin-top:10px;">
             <div style="font-size:36px;line-height:1;filter:drop-shadow(0 0 8px rgba(77,195,255,0.6));">🤖</div>
@@ -61,9 +61,27 @@
 
         <div id="cr-aviso-slot"></div>
 
-        <div style="background:linear-gradient(135deg,#0d1f3a,#0b1830);border:1px solid #24559b;border-radius:12px;padding:14px 16px;margin-bottom:14px;background-image:repeating-linear-gradient(0deg,rgba(45,125,255,0.05) 0 1px,transparent 1px 22px),repeating-linear-gradient(90deg,rgba(45,125,255,0.05) 0 1px,transparent 1px 22px);">
-            <div style="font-size:16px;font-weight:800;color:#eaf3ff;letter-spacing:1px;margin-bottom:4px;">BEM-VINDO!</div>
-            <div style="font-size:11.5px;color:#8fa8cf;line-height:1.5;">Selecione o robô que deseja iniciar e automatize suas tarefas.</div>
+        <div style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#0d1f3a,#0b1830);border:1px solid #24559b;border-radius:12px;padding:14px 16px;margin-bottom:14px;background-image:repeating-linear-gradient(0deg,rgba(45,125,255,0.05) 0 1px,transparent 1px 22px),repeating-linear-gradient(90deg,rgba(45,125,255,0.05) 0 1px,transparent 1px 22px);">
+            <div style="flex:1;min-width:0;">
+                <div style="font-size:16px;font-weight:800;color:#eaf3ff;letter-spacing:1px;margin-bottom:4px;">BEM-VINDO!</div>
+                <div style="font-size:11.5px;color:#8fa8cf;line-height:1.5;">Selecione o robô que deseja iniciar e automatize suas tarefas.</div>
+            </div>
+            <svg width="118" height="84" viewBox="0 0 118 84" fill="none" style="flex-shrink:0;filter:drop-shadow(0 0 5px rgba(77,195,255,0.45));">
+                <g stroke="#4dc3ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M6 52 L58 52 L70 70 L14 70 Z" fill="rgba(45,125,255,0.10)"/>
+                    <path d="M14 70 L14 76 L70 76 L70 70"/>
+                    <circle cx="22" cy="57" r="2.2"/><circle cx="32" cy="57" r="2.2"/><circle cx="42" cy="57" r="2.2"/><circle cx="52" cy="57" r="2.2"/>
+                    <circle cx="26" cy="64" r="2.2"/><circle cx="36" cy="64" r="2.2"/><circle cx="46" cy="64" r="2.2"/><circle cx="56" cy="64" r="2.2"/>
+                    <path d="M30 14 L38 46" stroke-width="2"/><path d="M27 8 L33 6 L31 16 Z" fill="rgba(77,195,255,0.25)"/><path d="M38 46 L40 51"/>
+                    <path d="M46 10 L52 44" stroke-width="2"/><path d="M43 4 L49 2 L48 12 Z" fill="rgba(77,195,255,0.25)"/><path d="M52 44 L54 49"/>
+                    <path d="M84 28 L84 62 Q84 68 90 68 Q96 68 96 62 L96 28" fill="rgba(45,125,255,0.10)"/>
+                    <path d="M81 28 L99 28"/>
+                    <path d="M86 50 L94 50" stroke="#2ecc71"/><path d="M86 56 L94 56" stroke="#2ecc71"/>
+                    <path d="M106 40 L106 52 L112 66 Q113 70 108 70 L100 70 Q95 70 96 66 L102 52 L102 40" fill="rgba(45,125,255,0.10)"/>
+                    <path d="M100 40 L108 40"/>
+                    <path d="M76 20 L79 17 M80 24 L84 22 M72 26 L75 25" stroke-width="1.2"/>
+                </g>
+            </svg>
         </div>
 
         <div id="cr-lista" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;max-height:44vh;overflow-y:auto;padding-right:6px;"></div>
@@ -1887,7 +1905,7 @@
     const abrirJanelaCodigos = nome => {
         roboAtual = nome;
         const info = infoRobos[nome] || {};
-        document.getElementById('cr-j-nome').innerText = nome;
+        document.getElementById('cr-j-nome').innerText = info.rotulo || nome;
         document.getElementById('cr-j-desc').innerText = info.desc || 'Automação';
         const ic = document.getElementById('cr-j-icone');
         ic.innerText = info.icone || '🤖';
@@ -1918,11 +1936,27 @@
         executarRobo(nome, texto);
     };
 
-    // ── CARDS DOS CONVÊNIOS (ordem alfabética) ────────────────────
+    // ── CARDS DOS CONVÊNIOS (ordem alfabética, nomes de exibição) ─
+    const EXIBICAO = [
+        { rotulo: "Affego",             chave: "AFFEGO" },
+        { rotulo: "Amil",               chave: "AMIL" },
+        { rotulo: "Inas GDF",           chave: "INAS" },
+        { rotulo: "Medsenior / UN SEG", chave: "MEDSENIOR/UN SEG" },
+        { rotulo: "Planassiste MPU",    chave: "PLANASSISTE MPU" },
+        { rotulo: "Plenum",             chave: "PLENUM" },
+        { rotulo: "PM / STJ",           chave: "PM/STJ" },
+        { rotulo: "Postal (Correios)",  chave: "POSTAL" },
+        { rotulo: "Sul America",        chave: "SULAMERICA" },
+        { rotulo: "TJDF",               chave: "TJDF" },
+        { rotulo: "TRE",                chave: "TRE" },
+        { rotulo: "TRF",                chave: "TRF" },
+        { rotulo: "TRT",                chave: "TRT" },
+        { rotulo: "TST",                chave: "TST" }
+    ];
     const container = document.getElementById('cr-lista');
-    const nomesOrdenados = Object.keys(robos).sort((a, b) => a.localeCompare(b, 'pt-BR'));
-    for (const nome of nomesOrdenados) {
-        const info = infoRobos[nome] || { icone: '🤖', cor: '#2d7dff', desc: 'Automação' };
+    for (const { rotulo, chave } of EXIBICAO) {
+        const info = infoRobos[chave] || { icone: '🤖', cor: '#2d7dff', desc: 'Automação' };
+        info.rotulo = rotulo;
         const card = document.createElement('div');
         card.className = 'cr-card';
         card.style.cssText = `
@@ -1938,14 +1972,14 @@
             <div style="display:flex;align-items:flex-start;gap:9px;">
                 <div style="width:38px;height:38px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:19px;background:linear-gradient(135deg,${info.cor}cc,${info.cor}55);box-shadow:0 0 10px ${info.cor}55;">${info.icone}</div>
                 <div style="flex:1;min-width:0;">
-                    <div style="font-size:12px;font-weight:800;color:#eaf3ff;line-height:1.25;word-break:break-word;">${nome}</div>
+                    <div style="font-size:12px;font-weight:800;color:#eaf3ff;line-height:1.25;word-break:break-word;">${rotulo}</div>
                     <div style="font-size:9.5px;color:#8fa8cf;line-height:1.4;margin-top:3px;">${info.desc}</div>
                 </div>
                 <div class="cr-seta" style="width:22px;height:22px;border-radius:50%;flex-shrink:0;background:#0e1a2e;border:1px solid #223a5e;display:flex;align-items:center;justify-content:center;font-size:11px;color:#cfe0ff;transition:all .15s ease;align-self:center;">›</div>
             </div>
             <div style="position:absolute;bottom:8px;left:14px;width:26px;height:3px;border-radius:2px;background:${info.cor};"></div>
         `;
-        card.onclick = () => abrirJanelaCodigos(nome);
+        card.onclick = () => abrirJanelaCodigos(chave);
         container.appendChild(card);
     }
 })();
