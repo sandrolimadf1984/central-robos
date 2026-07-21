@@ -7,18 +7,20 @@
         const est = document.createElement('style');
         est.id = 'estilo-central-robos';
         est.textContent =
-            '#cr-lista::-webkit-scrollbar{width:8px;}' +
-            '#cr-lista::-webkit-scrollbar-track{background:#0a1020;border-radius:4px;}' +
-            '#cr-lista::-webkit-scrollbar-thumb{background:#2d7dff;border-radius:4px;}' +
+            '#cr-lista::-webkit-scrollbar{width:9px;}' +
+            '#cr-lista::-webkit-scrollbar-track{background:#0a1020;border-radius:5px;}' +
+            '#cr-lista::-webkit-scrollbar-thumb{background:linear-gradient(#4dc3ff,#2d7dff);border-radius:5px;}' +
             '#cr-txt-codigos::-webkit-scrollbar{width:8px;}' +
             '#cr-txt-codigos::-webkit-scrollbar-thumb{background:#2d7dff;border-radius:4px;}' +
             '#cr-txt-codigos::placeholder{color:#5b7ba6;text-align:center;padding-top:52px;font-size:13px;}' +
             '.cr-card:hover{border-color:#2d7dff !important;box-shadow:0 0 14px rgba(45,125,255,0.35);}' +
             '.cr-card:hover .cr-seta{background:#2d7dff;color:#fff;}' +
             '#cr-lista,#cr-home,#cr-janela{cursor:default;}' +
-            '#cr-home::-webkit-scrollbar,#cr-janela::-webkit-scrollbar{width:8px;}' +
-            '#cr-home::-webkit-scrollbar-track,#cr-janela::-webkit-scrollbar-track{background:#0a1020;}' +
-            '#cr-home::-webkit-scrollbar-thumb,#cr-janela::-webkit-scrollbar-thumb{background:#2d7dff;border-radius:4px;}' +
+            '#cr-home,#cr-janela,#cr-lista{overflow-x:hidden;}' +
+            '#cr-home > *{flex:0 0 auto;}' +
+            '#cr-janela::-webkit-scrollbar{width:8px;}' +
+            '#cr-janela::-webkit-scrollbar-track{background:#0a1020;}' +
+            '#cr-janela::-webkit-scrollbar-thumb{background:#2d7dff;border-radius:4px;}' +
             '.cr-rz{position:absolute;z-index:20;}' +
             '.cr-rz-n{top:0;left:9px;right:9px;height:9px;cursor:ns-resize;}' +
             '.cr-rz-s{bottom:0;left:9px;right:9px;height:9px;cursor:ns-resize;}' +
@@ -41,6 +43,7 @@
         top: 16px;
         left: 16px;
         width: 400px;
+        height: min(700px, calc(100vh - 28px));
         background: linear-gradient(180deg, #0c1322 0%, #0a0f1c 100%);
         border: 1px solid #1d3557;
         border-radius: 16px;
@@ -59,7 +62,7 @@
     // ── TELA 1: menu principal ────────────────────────────────────
     const telaHome = document.createElement('div');
     telaHome.id = 'cr-home';
-    telaHome.style.cssText = 'position:relative;padding:8px 9px 6px 10px;flex:1;min-height:0;overflow-y:auto;cursor:default;border-radius:10px;';
+    telaHome.style.cssText = 'position:relative;padding:8px 9px 6px 10px;flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;cursor:default;border-radius:10px;';
     telaHome.innerHTML = `
         <div style="position:absolute;top:8px;right:14px;font-size:8.5px;letter-spacing:1px;color:#f5c518;text-shadow:0 0 6px rgba(245,197,24,0.45);font-weight:700;">CRIADO POR SANDRO DE LIMA PEREIRA</div>
 
@@ -122,7 +125,7 @@
             </svg>
         </div>
 
-        <div id="cr-lista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;overflow-y:auto;padding-right:4px;"></div>
+        <div id="cr-lista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;overflow-y:auto;padding-right:4px;flex:1 1 auto;min-height:70px;align-content:start;"></div>
 
         <div style="display:flex;align-items:flex-start;justify-content:center;gap:56px;margin:16px 0 6px;">
             <div id="cr-fechar-app" style="text-align:center;cursor:pointer;">
@@ -141,7 +144,7 @@
     // ── TELA 2: janela de códigos (uma para todos os robôs) ───────
     const telaJanela = document.createElement('div');
     telaJanela.id = 'cr-janela';
-    telaJanela.style.cssText = 'display:none;position:relative;padding:8px 9px 8px 10px;flex:1;min-height:0;overflow-y:auto;cursor:default;border-radius:10px;';
+    telaJanela.style.cssText = 'display:none;position:relative;padding:8px 9px 8px 10px;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;cursor:default;border-radius:10px;';
     telaJanela.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
             <div id="cr-voltar" style="width:34px;height:34px;border-radius:50%;background:#0e1a2e;border:1px solid #223a5e;display:flex;align-items:center;justify-content:center;font-size:16px;color:#cfe0ff;cursor:pointer;flex-shrink:0;">←</div>
@@ -178,7 +181,7 @@
     document.body.appendChild(menu);
 
     // ── ALÇAS DE REDIMENSIONAR (8 extremidades, igual janela do Chrome) ─
-    const ALTURA_MIN = 200, LARGURA_MIN = 260;
+    const ALTURA_MIN = 430, LARGURA_MIN = 260;
     ['n','s','w','e','nw','ne','sw','se'].forEach(dir => {
         const alca = document.createElement('div');
         alca.className = 'cr-rz cr-rz-' + dir;
@@ -1822,115 +1825,6 @@
                 alert("Finalizado! Foram inseridos " + order.length + " códigos únicos na AFFEGO.");
             })();
         },
-        "MPLAN_10_DIGITOS": () => {
-        (function () {
-            if (document.getElementById('g-painel-mplan10')) return;
-            const d = document.createElement('div');
-            d.id = 'g-painel-mplan10';
-            d.style.cssText = 'position:fixed;top:10px;right:10px;width:300px;background:#2d3436;color:#fff;padding:15px;z-index:999999;border-radius:8px;font-family:Arial;box-shadow:0 4px 10px rgba(0,0,0,0.5);border:3px solid #e67e22'; // Borda laranja para diferenciar
-            d.innerHTML = `
-                <h3 style="margin:0 0 10px;color:#f39c12">🤖 Códigos de 10 Dígitos</h3>
-                <p style="margin:0 0 10px;font-size:11px;color:#bdc3c7">Insira os códigos (Filtra apenas sequências de 10 números).</p>
-                <textarea id="g-txt-mplan10" style="width:100%;height:80px;color:#000;border-radius:4px;padding:5px;" placeholder="Cole os códigos de 10 dígitos aqui..."></textarea>
-                <button id="g-btn-mplan10" style="width:100%;padding:10px;background:#e67e22;color:#fff;border:none;border-radius:5px;cursor:pointer;margin-top:5px;font-weight:bold">INICIAR ▶</button>
-                <div id="g-status-mplan10" style="margin-top:10px;font-size:12px;color:#dfe6e9">Aguardando...</div>
-                <button onclick="this.parentElement.remove()" style="width:100%;padding:5px;margin-top:10px;background:#d63031;color:#fff;border:none;border-radius:5px;cursor:pointer;font-weight:bold;">❌ FECHAR</button>
-            `;
-            document.body.appendChild(d);
-            const wait = ms => new Promise(r => setTimeout(r, ms));
-            
-            document.getElementById('g-btn-mplan10').onclick = async () => {
-                const t = document.getElementById('g-txt-mplan10').value;
-                
-                // Regex ajustada: Captura termos que possuem EXATAMENTE 10 dígitos numéricos (\b\d{10}\b)
-                let todosCods = t.match(/\b\d{10}\b/g) || [];
-                if (!todosCods.length) return alert('Nenhum código de 10 dígitos foi encontrado no texto colado!');
-                
-                // Agrupa e conta as quantidades de códigos repetidos
-                const contagem = {};
-                todosCods.forEach(c => { contagem[c] = (contagem[c] || 0) + 1; });
-                const itensUnicos = Object.keys(contagem).map(c => ({ codigo: c, qtd: contagem[c] }));
-                
-                const status = document.getElementById('g-status-mplan10');
-                document.getElementById('g-btn-mplan10').disabled = true;
-                const setVal = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-                
-                for (let i = 0; i < itensUnicos.length; i++) {
-                    let item = itensUnicos[i];
-                    status.innerText = `Processando ${i + 1}/${itensUnicos.length}: ${item.codigo} (Qtd: ${item.qtd})`;
-                    
-                    // Captura todos os inputs de texto visíveis da página
-                    let inputs = Array.from(document.querySelectorAll('input[type="text"]')).filter(el => {
-                        return el.getBoundingClientRect().width > 0 && el.id !== 'g-txt-mplan10';
-                    });
-                    
-                    // Identifica os inputs por palavras-chave ou por exclusão (baseado no layout da tela do Mplan)
-                    let inpCodigo = inputs.find(el => el.placeholder.includes('Cód') || el.name.includes('cod') || el.id.includes('cod'));
-                    if (!inpCodigo && inputs.length >= 2) {
-                        inpCodigo = inputs[inputs.length - 4] || inputs[inputs.length - 3];
-                    }
-                    
-                    let inpQtd = inputs.find(el => el.name.includes('qtd') || el.name.includes('quant') || el.id.includes('qtd') || el.id.includes('quant'));
-                    if (!inpQtd && inputs.length >= 1) {
-                        inpQtd = inputs[inputs.length - 1]; // Geralmente o último campo preenchível da linha é a quantidade
-                    }
-                    
-                    // 1. Digita o Código do Procedimento
-                    if (inpCodigo) {
-                        inpCodigo.focus();
-                        setVal.call(inpCodigo, '');
-                        inpCodigo.dispatchEvent(new Event('input', { bubbles: true }));
-                        await wait(200);
-                        
-                        setVal.call(inpCodigo, item.codigo);
-                        inpCodigo.dispatchEvent(new Event('input', { bubbles: true }));
-                        inpCodigo.dispatchEvent(new Event('change', { bubbles: true }));
-                        inpCodigo.dispatchEvent(new Event('blur', { bubbles: true }));
-                        
-                        // Simula pressionar "Tab" para forçar o sistema a buscar a descrição do item
-                        inpCodigo.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', keyCode: 9, bubbles: true }));
-                        await wait(1500); // Pausa para o Ajax do site processar o código de 10 dígitos
-                    }
-                    
-                    // 2. Digita a Quantidade Calculada
-                    if (inpQtd) {
-                        inpQtd.focus();
-                        setVal.call(inpQtd, '');
-                        inpQtd.dispatchEvent(new Event('input', { bubbles: true }));
-                        await wait(200);
-                        
-                        setVal.call(inpQtd, item.qtd.toString());
-                        inpQtd.dispatchEvent(new Event('input', { bubbles: true }));
-                        inpQtd.dispatchEvent(new Event('change', { bubbles: true }));
-                        await wait(400);
-                    }
-                    
-                    // 3. Procura e Clica no Botão Verde de Adicionar (+)
-                    let btn = document.querySelector('.fa-plus, .fa-plus-circle, button[class*="success" i]');
-                    if (!btn) {
-                        let elementos = Array.from(document.querySelectorAll('button, a, span, img')).filter(el => el.getBoundingClientRect().width > 0);
-                        btn = elementos.find(el => el.innerHTML.includes('plus') || el.className.includes('add') || el.className.includes('plus'));
-                    }
-                    
-                    if (btn) {
-                        btn.click();
-                        let icone = btn.querySelector('i');
-                        if (icone) icone.click();
-                    } else {
-                        // Clique de emergência por proximidade visual ao input de quantidade
-                        if (inpQtd && inpQtd.nextElementSibling) {
-                            inpQtd.nextElementSibling.click();
-                        }
-                    }
-                    
-                    await wait(2000); // Tempo de espera para o sistema computar a linha na tabela
-                }
-                
-                status.innerText = '✅ Concluído!';
-                document.getElementById('g-btn-mplan10').disabled = false;
-            };
-        })();
-    },
     };
     // ── FICHA DE CADA CONVÊNIO (ícone, cor, descrição, modo de entrega) ──
     const infoRobos = {
@@ -1938,7 +1832,6 @@
         "AMIL":             { icone: "🩺", cor: "#2ecc71", desc: "Automação para Rede Credenciada Amil",           modo: "painel", txt: "tc",            btn: "bi" },
         "INAS":             { icone: "🤝", cor: "#d9a520", desc: "Automação para Convênios Inas GDF",              modo: "painel", txt: "g-codes",       btn: "g-start" },
         "MEDSENIOR/UN SEG": { icone: "🏥", cor: "#27ae60", desc: "Automação para Planos de Saúde",                 modo: "painel", txt: "txtInput",      btn: "btnRun" },
-        "MPLAN_10_DIGITOS": { icone: "🔟", cor: "#9b59b6", desc: "Automação para Convênios MPlan (10 dígitos)",    modo: "painel", txt: "g-txt-mplan10", btn: "g-btn-mplan10" },
         "PLANASSISTE MPU":  { icone: "📝", cor: "#2d7dff", desc: "Automação para Planilhas do MPU",                modo: "painel", txt: "rc",            btn: "rb" },
         "PLENUM":           { icone: "⚖️", cor: "#8e44ad", desc: "Automação para Convênios de Advocacia e Justiça",modo: "painel", txt: "plenum-txt",    btn: "plenum-btn" },
         "PM/STJ":           { icone: "🛡️", cor: "#5dade2", desc: "Automação para Segurança e Justiça Superior",    modo: "prompt" },
@@ -2030,7 +1923,7 @@
 
     document.getElementById('cr-voltar').onclick = () => {
         telaJanela.style.display = 'none';
-        telaHome.style.display = 'block';
+        telaHome.style.display = 'flex';
     };
     document.getElementById('cr-j-fechar').onclick = () => menu.remove();
     document.getElementById('cr-limpar').onclick = () => {
