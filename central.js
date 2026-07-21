@@ -14,7 +14,13 @@
             '#cr-txt-codigos::-webkit-scrollbar-thumb{background:#2d7dff;border-radius:4px;}' +
             '#cr-txt-codigos::placeholder{color:#5b7ba6;text-align:center;padding-top:52px;font-size:13px;}' +
             '.cr-card:hover{border-color:#2d7dff !important;box-shadow:0 0 14px rgba(45,125,255,0.35);}' +
-            '.cr-card:hover .cr-seta{background:#2d7dff;color:#fff;}';
+            '.cr-card:hover .cr-seta{background:#2d7dff;color:#fff;}' +
+            '#cr-lista,#cr-home,#cr-janela{cursor:default;}' +
+            '#cr-home::-webkit-scrollbar,#cr-janela::-webkit-scrollbar{width:8px;}' +
+            '#cr-home::-webkit-scrollbar-track,#cr-janela::-webkit-scrollbar-track{background:#0a1020;}' +
+            '#cr-home::-webkit-scrollbar-thumb,#cr-janela::-webkit-scrollbar-thumb{background:#2d7dff;border-radius:4px;}' +
+            '.cr-resize{position:absolute;left:0;right:0;height:8px;cursor:ns-resize;z-index:5;}' +
+            '.cr-resize:hover{background:rgba(45,125,255,0.35);}';
         document.head.appendChild(est);
     }
 
@@ -35,12 +41,14 @@
         color: #dbe7ff;
         cursor: move;
         overflow: hidden;
+        display: flex;
+        flex-direction: column;
     `;
 
     // ── TELA 1: menu principal ────────────────────────────────────
     const telaHome = document.createElement('div');
     telaHome.id = 'cr-home';
-    telaHome.style.cssText = 'position:relative;padding:14px 16px 12px;';
+    telaHome.style.cssText = 'position:relative;padding:14px 16px 12px;flex:1;min-height:0;overflow-y:auto;';
     telaHome.innerHTML = `
         <div style="position:absolute;top:8px;right:14px;font-size:8.5px;letter-spacing:1px;color:#f5c518;text-shadow:0 0 6px rgba(245,197,24,0.45);font-weight:700;">CRIADO POR SANDRO DE LIMA PEREIRA</div>
 
@@ -61,25 +69,44 @@
 
         <div id="cr-aviso-slot"></div>
 
-        <div style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#0d1f3a,#0b1830);border:1px solid #24559b;border-radius:12px;padding:14px 16px;margin-bottom:14px;background-image:repeating-linear-gradient(0deg,rgba(45,125,255,0.05) 0 1px,transparent 1px 22px),repeating-linear-gradient(90deg,rgba(45,125,255,0.05) 0 1px,transparent 1px 22px);">
+        <div style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#0d1f3a,#0b1830);border:1px solid #24559b;border-radius:12px;padding:14px 14px 14px 16px;margin-bottom:14px;background-image:repeating-linear-gradient(0deg,rgba(45,125,255,0.05) 0 1px,transparent 1px 22px),repeating-linear-gradient(90deg,rgba(45,125,255,0.05) 0 1px,transparent 1px 22px);">
             <div style="flex:1;min-width:0;">
                 <div style="font-size:16px;font-weight:800;color:#eaf3ff;letter-spacing:1px;margin-bottom:4px;">BEM-VINDO!</div>
                 <div style="font-size:11.5px;color:#8fa8cf;line-height:1.5;">Selecione o robô que deseja iniciar e automatize suas tarefas.</div>
             </div>
-            <svg width="118" height="84" viewBox="0 0 118 84" fill="none" style="flex-shrink:0;filter:drop-shadow(0 0 5px rgba(77,195,255,0.45));">
-                <g stroke="#4dc3ff" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M6 52 L58 52 L70 70 L14 70 Z" fill="rgba(45,125,255,0.10)"/>
-                    <path d="M14 70 L14 76 L70 76 L70 70"/>
-                    <circle cx="22" cy="57" r="2.2"/><circle cx="32" cy="57" r="2.2"/><circle cx="42" cy="57" r="2.2"/><circle cx="52" cy="57" r="2.2"/>
-                    <circle cx="26" cy="64" r="2.2"/><circle cx="36" cy="64" r="2.2"/><circle cx="46" cy="64" r="2.2"/><circle cx="56" cy="64" r="2.2"/>
-                    <path d="M30 14 L38 46" stroke-width="2"/><path d="M27 8 L33 6 L31 16 Z" fill="rgba(77,195,255,0.25)"/><path d="M38 46 L40 51"/>
-                    <path d="M46 10 L52 44" stroke-width="2"/><path d="M43 4 L49 2 L48 12 Z" fill="rgba(77,195,255,0.25)"/><path d="M52 44 L54 49"/>
-                    <path d="M84 28 L84 62 Q84 68 90 68 Q96 68 96 62 L96 28" fill="rgba(45,125,255,0.10)"/>
-                    <path d="M81 28 L99 28"/>
-                    <path d="M86 50 L94 50" stroke="#2ecc71"/><path d="M86 56 L94 56" stroke="#2ecc71"/>
-                    <path d="M106 40 L106 52 L112 66 Q113 70 108 70 L100 70 Q95 70 96 66 L102 52 L102 40" fill="rgba(45,125,255,0.10)"/>
-                    <path d="M100 40 L108 40"/>
-                    <path d="M76 20 L79 17 M80 24 L84 22 M72 26 L75 25" stroke-width="1.2"/>
+            <svg width="128" height="92" viewBox="0 0 130 92" fill="none" style="flex-shrink:0;filter:drop-shadow(0 0 6px rgba(77,195,255,0.5));">
+                <g stroke="#4dc3ff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M80 26 L102 18 L124 26 L102 34 Z" fill="rgba(45,125,255,0.16)"/><path d="M80 26 L102 34 L102 51 L80 43 Z" fill="rgba(10,26,52,0.6)"/><path d="M102 34 L124 26 L124 43 L102 51 Z" fill="rgba(10,26,52,0.4)"/><ellipse cx="91" cy="38" rx="5.4" ry="6.4" fill="rgba(77,195,255,0.18)"/><ellipse cx="91" cy="38" rx="2.4" ry="3" stroke="#2ecc71"/><path d="M108 40 L118 36 M108 45 L118 41" stroke-width="1.1"/>
+                    <path d="M40.8 10 L47.2 10 L46.6 30 L41.4 30 Z" fill="rgba(45,125,255,0.16)"/><path d="M42.9 6 L45.1 6 L45.1 10 L42.9 10 Z" fill="rgba(77,195,255,0.5)"/><path d="M41.4 30 L46.6 30 L45.4 42 L42.6 42 Z"/><path d="M42.6 42 L45.4 42 L44 50 Z" fill="rgba(77,195,255,0.35)"/>
+                    <path d="M50.8 7 L57.2 7 L56.6 27 L51.4 27 Z" fill="rgba(45,125,255,0.16)"/><path d="M52.9 3 L55.1 3 L55.1 7 L52.9 7 Z" fill="rgba(77,195,255,0.5)"/><path d="M51.4 27 L56.6 27 L55.4 39 L52.6 39 Z"/><path d="M52.6 39 L55.4 39 L54 47 Z" fill="rgba(77,195,255,0.35)"/>
+                    <path d="M60.8 11 L67.2 11 L66.6 31 L61.4 31 Z" fill="rgba(45,125,255,0.16)"/><path d="M62.9 7 L65.1 7 L65.1 11 L62.9 11 Z" fill="rgba(77,195,255,0.5)"/><path d="M61.4 31 L66.6 31 L65.4 43 L62.6 43 Z"/><path d="M62.6 43 L65.4 43 L64 51 Z" fill="rgba(77,195,255,0.35)"/>
+                    <path d="M14 64 L54 48 L92 60 L52 76 Z" fill="rgba(45,125,255,0.13)"/><path d="M14 64 L52 76 L52 85 L14 73 Z" fill="rgba(12,30,60,0.55)"/><path d="M52 76 L92 60 L92 69 L52 85 Z" fill="rgba(12,30,60,0.35)"/>
+                    <ellipse cx="22.1" cy="64.2" rx="2.1" ry="1.25"/>
+                    <ellipse cx="28.8" cy="61.5" rx="2.1" ry="1.25"/>
+                    <ellipse cx="35.4" cy="58.8" rx="2.1" ry="1.25"/>
+                    <ellipse cx="42.1" cy="56.2" rx="2.1" ry="1.25"/>
+                    <ellipse cx="48.8" cy="53.5" rx="2.1" ry="1.25"/>
+                    <ellipse cx="55.4" cy="50.8" rx="2.1" ry="1.25"/>
+                    <ellipse cx="31.6" cy="67.2" rx="2.1" ry="1.25"/>
+                    <ellipse cx="38.2" cy="64.5" rx="2.1" ry="1.25"/>
+                    <ellipse cx="44.9" cy="61.8" rx="2.1" ry="1.25"/>
+                    <ellipse cx="51.6" cy="59.2" rx="2.1" ry="1.25"/>
+                    <ellipse cx="58.2" cy="56.5" rx="2.1" ry="1.25"/>
+                    <ellipse cx="64.9" cy="53.8" rx="2.1" ry="1.25"/>
+                    <ellipse cx="41.1" cy="70.2" rx="2.1" ry="1.25"/>
+                    <ellipse cx="47.8" cy="67.5" rx="2.1" ry="1.25"/>
+                    <ellipse cx="54.4" cy="64.8" rx="2.1" ry="1.25"/>
+                    <ellipse cx="61.1" cy="62.2" rx="2.1" ry="1.25"/>
+                    <ellipse cx="67.8" cy="59.5" rx="2.1" ry="1.25"/>
+                    <ellipse cx="74.4" cy="56.8" rx="2.1" ry="1.25"/>
+                    <ellipse cx="50.6" cy="73.2" rx="2.1" ry="1.25"/>
+                    <ellipse cx="57.2" cy="70.5" rx="2.1" ry="1.25"/>
+                    <ellipse cx="63.9" cy="67.8" rx="2.1" ry="1.25"/>
+                    <ellipse cx="70.6" cy="65.2" rx="2.1" ry="1.25"/>
+                    <ellipse cx="77.2" cy="62.5" rx="2.1" ry="1.25"/>
+                    <ellipse cx="83.9" cy="59.8" rx="2.1" ry="1.25"/>
+                    <path d="M104 56 L104 72 Q104 78 108 78 Q112 78 112 72 L112 56" fill="rgba(45,125,255,0.13)"/><path d="M102.6 56 L113.4 56"/><path d="M105 70 Q108 73 111 70" stroke="#2ecc71"/><path d="M116 56 L116 72 Q116 78 120 78 Q124 78 124 72 L124 56" fill="rgba(45,125,255,0.13)"/><path d="M114.6 56 L125.4 56"/><path d="M117 70 Q120 73 123 70" stroke="#2ecc71"/>
+                    <path d="M18 80 L34 80" stroke-width="1.2"/><path d="M40 82 L52 82" stroke-width="1.2"/><path d="M70 74 L78 71 L80 74 L72 77 Z" fill="rgba(77,195,255,0.2)"/>
                 </g>
             </svg>
         </div>
@@ -103,7 +130,7 @@
     // ── TELA 2: janela de códigos (uma para todos os robôs) ───────
     const telaJanela = document.createElement('div');
     telaJanela.id = 'cr-janela';
-    telaJanela.style.cssText = 'display:none;position:relative;padding:14px 16px 14px;';
+    telaJanela.style.cssText = 'display:none;position:relative;padding:14px 16px 14px;flex:1;min-height:0;overflow-y:auto;';
     telaJanela.innerHTML = `
         <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
             <div id="cr-voltar" style="width:34px;height:34px;border-radius:50%;background:#0e1a2e;border:1px solid #223a5e;display:flex;align-items:center;justify-content:center;font-size:16px;color:#cfe0ff;cursor:pointer;flex-shrink:0;">←</div>
@@ -139,6 +166,63 @@
     menu.appendChild(telaJanela);
     document.body.appendChild(menu);
 
+    // ── ALÇAS DE REDIMENSIONAR (bordas superior e inferior) ───────
+    const alcaTopo = document.createElement('div');
+    alcaTopo.className = 'cr-resize';
+    alcaTopo.style.top = '0';
+    const alcaBase = document.createElement('div');
+    alcaBase.className = 'cr-resize';
+    alcaBase.style.bottom = '0';
+    menu.appendChild(alcaTopo);
+    menu.appendChild(alcaBase);
+
+    const ALTURA_MIN = 200;
+    (() => {
+        let ativo = null, y0 = 0, alt0 = 0, top0 = 0;
+        const mover = ev => {
+            if (!ativo) return;
+            const p = ev.touches ? ev.touches[0] : ev;
+            const d = p.clientY - y0;
+            if (ativo === 'base') {
+                let h = Math.max(ALTURA_MIN, Math.min(alt0 + d, window.innerHeight - top0 - 8));
+                menu.style.height = h + 'px';
+            } else {
+                let h = Math.max(ALTURA_MIN, Math.min(alt0 - d, top0 + alt0 - 8));
+                menu.style.height = h + 'px';
+                menu.style.top = (top0 + alt0 - h) + 'px';
+            }
+            ev.preventDefault();
+        };
+        const parar = () => {
+            ativo = null;
+            document.body.style.userSelect = '';
+            document.removeEventListener('mousemove', mover);
+            document.removeEventListener('mouseup', parar);
+            document.removeEventListener('touchmove', mover);
+            document.removeEventListener('touchend', parar);
+        };
+        const iniciar = qual => ev => {
+            const p = ev.touches ? ev.touches[0] : ev;
+            const r = menu.getBoundingClientRect();
+            menu.style.left = r.left + 'px';
+            menu.style.top = r.top + 'px';
+            menu.style.right = 'auto';
+            menu.style.bottom = 'auto';
+            ativo = qual; y0 = p.clientY; alt0 = r.height; top0 = r.top;
+            document.body.style.userSelect = 'none';
+            document.addEventListener('mousemove', mover);
+            document.addEventListener('mouseup', parar);
+            document.addEventListener('touchmove', mover, { passive: false });
+            document.addEventListener('touchend', parar);
+            ev.preventDefault();
+            ev.stopPropagation();
+        };
+        alcaTopo.addEventListener('mousedown', iniciar('topo'));
+        alcaBase.addEventListener('mousedown', iniciar('base'));
+        alcaTopo.addEventListener('touchstart', iniciar('topo'), { passive: false });
+        alcaBase.addEventListener('touchstart', iniciar('base'), { passive: false });
+    })();
+
     // ── ARRASTAR O PAINEL PELA TELA ───────────────────────────────
     (() => {
         let arrastando = false, dx = 0, dy = 0;
@@ -163,7 +247,10 @@
             document.removeEventListener('touchend', parar);
         };
         const iniciar = ev => {
-            if (ev.target.closest('button, textarea, input, select, a, .cr-card, #cr-fechar-app, #cr-marcador, #cr-voltar, #cr-j-fechar, #cr-lista')) return;
+            const alvo = ev.target;
+            if (alvo.closest('button, textarea, input, select, a, .cr-card, .cr-resize, #cr-fechar-app, #cr-marcador, #cr-voltar, #cr-j-fechar, #cr-lista')) return;
+            // clique em cima de barra de rolagem: deixa o navegador cuidar
+            if (alvo.nodeType === 1 && (ev.offsetX > alvo.clientWidth || ev.offsetY > alvo.clientHeight)) return;
             const p = ev.touches ? ev.touches[0] : ev;
             const r = menu.getBoundingClientRect();
             menu.style.left = r.left + 'px';
@@ -1902,15 +1989,14 @@
 
     // ── NAVEGAÇÃO ENTRE AS DUAS TELAS ─────────────────────────────
     let roboAtual = null;
-    const abrirJanelaCodigos = nome => {
-        roboAtual = nome;
-        const info = infoRobos[nome] || {};
-        document.getElementById('cr-j-nome').innerText = info.rotulo || nome;
-        document.getElementById('cr-j-desc').innerText = info.desc || 'Automação';
+    const abrirJanelaCodigos = item => {
+        roboAtual = item.chave;
+        document.getElementById('cr-j-nome').innerText = item.rotulo;
+        document.getElementById('cr-j-desc').innerText = item.desc;
         const ic = document.getElementById('cr-j-icone');
-        ic.innerText = info.icone || '🤖';
-        ic.style.background = 'linear-gradient(135deg,' + (info.cor || '#2d7dff') + 'cc,' + (info.cor || '#2d7dff') + '66)';
-        ic.style.boxShadow = '0 0 12px ' + (info.cor || '#2d7dff') + '80';
+        ic.innerText = item.icone;
+        ic.style.background = 'linear-gradient(135deg,' + item.cor + 'cc,' + item.cor + '66)';
+        ic.style.boxShadow = '0 0 12px ' + item.cor + '80';
         document.getElementById('cr-txt-codigos').value = '';
         telaHome.style.display = 'none';
         telaJanela.style.display = 'block';
@@ -1937,26 +2023,28 @@
     };
 
     // ── CARDS DOS CONVÊNIOS (ordem alfabética, nomes de exibição) ─
+    // Medsenior e Unimed Seguros usam o mesmo autorizador; PM e STJ também.
     const EXIBICAO = [
-        { rotulo: "Affego",             chave: "AFFEGO" },
-        { rotulo: "Amil",               chave: "AMIL" },
-        { rotulo: "Inas GDF",           chave: "INAS" },
-        { rotulo: "Medsenior / UN SEG", chave: "MEDSENIOR/UN SEG" },
-        { rotulo: "Planassiste MPU",    chave: "PLANASSISTE MPU" },
-        { rotulo: "Plenum",             chave: "PLENUM" },
-        { rotulo: "PM / STJ",           chave: "PM/STJ" },
-        { rotulo: "Postal (Correios)",  chave: "POSTAL" },
-        { rotulo: "Sul America",        chave: "SULAMERICA" },
-        { rotulo: "TJDF",               chave: "TJDF" },
-        { rotulo: "TRE",                chave: "TRE" },
-        { rotulo: "TRF",                chave: "TRF" },
-        { rotulo: "TRT",                chave: "TRT" },
-        { rotulo: "TST",                chave: "TST" }
+        { rotulo: "Affego",            chave: "AFFEGO",           icone: "🛠️", cor: "#378ADD", desc: "Automação para Fisco e Convênios Affego" },
+        { rotulo: "Amil",              chave: "AMIL",             icone: "🩺", cor: "#2ecc71", desc: "Automação para Rede Credenciada Amil" },
+        { rotulo: "Inas GDF",          chave: "INAS",             icone: "🤝", cor: "#d9a520", desc: "Automação para Convênios Inas GDF" },
+        { rotulo: "Medsenior",         chave: "MEDSENIOR/UN SEG", icone: "🏥", cor: "#27ae60", desc: "Automação para Convênio Medsenior" },
+        { rotulo: "Planassiste MPU",   chave: "PLANASSISTE MPU",  icone: "📝", cor: "#2d7dff", desc: "Automação para Planilhas do MPU" },
+        { rotulo: "Plenum",            chave: "PLENUM",           icone: "⚖️", cor: "#8e44ad", desc: "Automação para Convênios de Advocacia e Justiça" },
+        { rotulo: "PM",                chave: "PM/STJ",           icone: "🛡️", cor: "#5dade2", desc: "Automação para Polícia Militar" },
+        { rotulo: "Postal (Correios)", chave: "POSTAL",           icone: "✉️", cor: "#d4ac0d", desc: "Automação para Logística Postal" },
+        { rotulo: "STJ",               chave: "PM/STJ",           icone: "🏛️", cor: "#4a90d9", desc: "Automação para Superior Tribunal de Justiça" },
+        { rotulo: "Sul America",       chave: "SULAMERICA",       icone: "🌎", cor: "#e74c3c", desc: "Automação para Convênios SulAmérica" },
+        { rotulo: "TJDF",              chave: "TJDF",             icone: "🏛️", cor: "#e67e22", desc: "Automação para Tribunal de Justiça do DF" },
+        { rotulo: "TRE",               chave: "TRE",              icone: "🗳️", cor: "#7f9fc4", desc: "Automação para Tribunal Regional Eleitoral" },
+        { rotulo: "TRF",               chave: "TRF",              icone: "📖", cor: "#1d9e75", desc: "Automação para Tribunal Regional Federal" },
+        { rotulo: "TRT",               chave: "TRT",              icone: "🤝", cor: "#e67e22", desc: "Automação para Tribunal Regional do Trabalho" },
+        { rotulo: "TST",               chave: "TST",              icone: "🔨", cor: "#e24b4a", desc: "Automação para Tribunal Superior do Trabalho" },
+        { rotulo: "Unimed Seguros",    chave: "MEDSENIOR/UN SEG", icone: "💚", cor: "#16a085", desc: "Automação para Convênio Unimed Seguros" }
     ];
     const container = document.getElementById('cr-lista');
-    for (const { rotulo, chave } of EXIBICAO) {
-        const info = infoRobos[chave] || { icone: '🤖', cor: '#2d7dff', desc: 'Automação' };
-        info.rotulo = rotulo;
+    for (const item of EXIBICAO) {
+        const { rotulo, icone, cor, desc } = item;
         const card = document.createElement('div');
         card.className = 'cr-card';
         card.style.cssText = `
@@ -1970,16 +2058,16 @@
         `;
         card.innerHTML = `
             <div style="display:flex;align-items:flex-start;gap:9px;">
-                <div style="width:38px;height:38px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:19px;background:linear-gradient(135deg,${info.cor}cc,${info.cor}55);box-shadow:0 0 10px ${info.cor}55;">${info.icone}</div>
+                <div style="width:38px;height:38px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:19px;background:linear-gradient(135deg,${cor}cc,${cor}55);box-shadow:0 0 10px ${cor}55;">${icone}</div>
                 <div style="flex:1;min-width:0;">
                     <div style="font-size:12px;font-weight:800;color:#eaf3ff;line-height:1.25;word-break:break-word;">${rotulo}</div>
-                    <div style="font-size:9.5px;color:#8fa8cf;line-height:1.4;margin-top:3px;">${info.desc}</div>
+                    <div style="font-size:9.5px;color:#8fa8cf;line-height:1.4;margin-top:3px;">${desc}</div>
                 </div>
                 <div class="cr-seta" style="width:22px;height:22px;border-radius:50%;flex-shrink:0;background:#0e1a2e;border:1px solid #223a5e;display:flex;align-items:center;justify-content:center;font-size:11px;color:#cfe0ff;transition:all .15s ease;align-self:center;">›</div>
             </div>
-            <div style="position:absolute;bottom:8px;left:14px;width:26px;height:3px;border-radius:2px;background:${info.cor};"></div>
+            <div style="position:absolute;bottom:8px;left:14px;width:26px;height:3px;border-radius:2px;background:${cor};"></div>
         `;
-        card.onclick = () => abrirJanelaCodigos(chave);
+        card.onclick = () => abrirJanelaCodigos(item);
         container.appendChild(card);
     }
 })();
