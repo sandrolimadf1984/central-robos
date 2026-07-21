@@ -2,73 +2,128 @@
     // 1. Impede a abertura de múltiplos menus centrais
     if (document.getElementById('menu-central-robos')) return;
 
-    // 2. Criação do painel visual do Menu Central
-    const menu = document.createElement('div');
-    menu.id = 'menu-central-robos';
-
-    // Fonte vintage (carrega se o portal permitir; senão usa serifada padrão)
-    if (!document.getElementById('fonte-central-robos')) {
-        const fonte = document.createElement('link');
-        fonte.id = 'fonte-central-robos';
-        fonte.rel = 'stylesheet';
-        fonte.href = 'https://fonts.googleapis.com/css2?family=Rye&family=Roboto+Slab:wght@700&display=swap';
-        document.head.appendChild(fonte);
-    }
-    // Barra de rolagem dourada
+    // ── estilos globais do app ────────────────────────────────────
     if (!document.getElementById('estilo-central-robos')) {
         const est = document.createElement('style');
         est.id = 'estilo-central-robos';
         est.textContent =
-            '#botoes-robos::-webkit-scrollbar{width:12px;}' +
-            '#botoes-robos::-webkit-scrollbar-track{background:#5c0808;border-radius:6px;}' +
-            '#botoes-robos::-webkit-scrollbar-thumb{background:linear-gradient(#e8c874,#c99a3a);border-radius:6px;border:2px solid #5c0808;}';
+            '#cr-lista::-webkit-scrollbar{width:8px;}' +
+            '#cr-lista::-webkit-scrollbar-track{background:#0a1020;border-radius:4px;}' +
+            '#cr-lista::-webkit-scrollbar-thumb{background:#2d7dff;border-radius:4px;}' +
+            '#cr-txt-codigos::-webkit-scrollbar{width:8px;}' +
+            '#cr-txt-codigos::-webkit-scrollbar-thumb{background:#2d7dff;border-radius:4px;}' +
+            '#cr-txt-codigos::placeholder{color:#5b7ba6;text-align:center;padding-top:52px;font-size:13px;}' +
+            '.cr-card:hover{border-color:#2d7dff !important;box-shadow:0 0 14px rgba(45,125,255,0.35);}' +
+            '.cr-card:hover .cr-seta{background:#2d7dff;color:#fff;}';
         document.head.appendChild(est);
     }
 
+    // ── casca do app ──────────────────────────────────────────────
+    const menu = document.createElement('div');
+    menu.id = 'menu-central-robos';
     menu.style.cssText = `
         position: fixed;
-        top: 20px;
-        left: 20px;
-        width: 340px;
-        padding: 0;
-        background: linear-gradient(180deg, #8a0f0f 0%, #6d0a0a 100%);
-        border: 3px solid #111;
-        border-radius: 6px;
-        box-shadow: 0 12px 45px rgba(0,0,0,0.75);
+        top: 16px;
+        left: 16px;
+        width: 400px;
+        background: linear-gradient(180deg, #0c1322 0%, #0a0f1c 100%);
+        border: 1px solid #1d3557;
+        border-radius: 16px;
+        box-shadow: 0 0 0 1px rgba(45,125,255,0.25), 0 0 30px rgba(45,125,255,0.28), 0 18px 50px rgba(0,0,0,0.7);
         z-index: 2147483647;
-        font-family: 'Rye', 'Rockwell', Georgia, 'Times New Roman', serif;
+        font-family: 'Segoe UI', system-ui, Arial, sans-serif;
+        color: #dbe7ff;
+        cursor: move;
+        overflow: hidden;
     `;
 
-    const cornerSVG = pos => `<svg width="44" height="44" viewBox="0 0 44 44" fill="none" style="position:absolute;${pos};z-index:2;pointer-events:none;">`
-        + `<path d="M4 4 H20 M4 4 V20" stroke="#f5c518" stroke-width="3" stroke-linecap="round"/>`
-        + `<path d="M4 20 Q4 4 20 4" stroke="#f5c518" stroke-width="1.5" fill="none"/>`
-        + `<path d="M12 4 Q30 4 30 22" stroke="#f5c518" stroke-width="1.3" fill="none" opacity="0.7"/>`
-        + `<path d="M4 12 Q4 30 22 30" stroke="#f5c518" stroke-width="1.3" fill="none" opacity="0.7"/>`
-        + `<circle cx="4" cy="4" r="2.6" fill="#f5c518"/></svg>`;
+    // ── TELA 1: menu principal ────────────────────────────────────
+    const telaHome = document.createElement('div');
+    telaHome.id = 'cr-home';
+    telaHome.style.cssText = 'position:relative;padding:14px 16px 12px;';
+    telaHome.innerHTML = `
+        <div style="position:absolute;top:8px;right:14px;font-size:8.5px;letter-spacing:1px;color:#4dc3ff;font-weight:700;">CRIADO POR SANDRO DE LIMA PEREIRA</div>
 
-    menu.innerHTML =
-        '<div style="position:absolute;inset:6px;border:2px solid #f5c518;border-radius:3px;pointer-events:none;z-index:0;"></div>'
-        + cornerSVG('top:2px;left:2px;transform:rotate(0deg)')
-        + cornerSVG('top:2px;right:2px;transform:rotate(90deg)')
-        + cornerSVG('bottom:2px;right:2px;transform:rotate(180deg)')
-        + cornerSVG('bottom:2px;left:2px;transform:rotate(270deg)')
-        + '<div style="position:relative;z-index:1;padding:24px 20px 20px;">'
-        +   '<h2 style="margin:4px 0 2px;font-size:22px;text-align:center;color:#ffd633;letter-spacing:1px;text-shadow:2px 2px 0 rgba(0,0,0,0.55),0 0 2px #000;font-weight:700;">CENTRAL DE AUTOMAÇÃO</h2>'
-        +   '<div style="text-align:center;margin:0 0 4px;color:#ffffff;font-family:Rockwell,\'Roboto Slab\',Georgia,serif;font-weight:700;line-height:1;text-shadow:1px 1px 2px rgba(0,0,0,0.55);"><span style="font-size:16px;letter-spacing:.5px;">CLT</span><span style="font-size:13px;">zinho</span> <span style="font-size:15px;letter-spacing:2px;">DIGITAL</span></div>'
-        +   '<p style="font-size:12px;text-align:center;color:#ffd633;letter-spacing:2px;margin:0 0 18px;">SELECIONE O ROBÔ PARA INICIAR</p>'
-        +   '<div id="botoes-robos" style="display:flex;flex-direction:column;gap:11px;max-height:48vh;overflow-y:auto;padding:4px 8px 4px 4px;"></div>'
-        +   '<div style="height:1px;background:rgba(245,197,24,0.45);margin:14px 4px 12px;"></div>'
-        +   '<button id="btn-marcar-checkboxes" style="display:block;width:100%;padding:11px;background:linear-gradient(180deg,#f6a83d,#dd8410);color:#fff;border:2px solid #ffd633;border-radius:26px;cursor:pointer;font-weight:800;font-size:14px;font-family:Georgia,serif;box-shadow:0 3px 6px rgba(0,0,0,0.45);">&#9745; Marcar Checkboxes</button>'
-        +   '<button id="fechar-menu-central" style="margin:10px auto 0;display:block;width:72%;padding:10px;background:linear-gradient(180deg,#e23b2e,#b91f16);color:#fff;border:2px solid #fff;border-radius:26px;cursor:pointer;font-weight:800;font-size:14px;font-family:Georgia,serif;box-shadow:0 3px 7px rgba(0,0,0,0.5);">✖ Close</button>'
-        +   '<div style="text-align:center;margin-top:12px;font-size:11px;color:#e0b84f;font-family:Georgia,serif;letter-spacing:.3px;">Criado por Sandro de Lima Pereira</div>'
-        + '</div>';
+        <div style="display:flex;align-items:center;gap:12px;margin-top:10px;">
+            <div style="font-size:36px;line-height:1;filter:drop-shadow(0 0 8px rgba(77,195,255,0.6));">🤖</div>
+            <div style="flex:1;">
+                <div style="font-size:15px;font-weight:700;color:#e8f1ff;letter-spacing:2px;line-height:1.1;">CENTRAL DE</div>
+                <div style="font-size:26px;font-weight:800;color:#4dc3ff;letter-spacing:2px;line-height:1.1;text-shadow:0 0 12px rgba(77,195,255,0.55);">AUTOMAÇÃO</div>
+            </div>
+            <div style="display:flex;align-items:center;gap:6px;background:#0e1a2e;border:1px solid #223a5e;border-radius:16px;padding:5px 12px;font-size:10px;font-weight:700;color:#cfe0ff;letter-spacing:1px;">
+                <span style="width:8px;height:8px;border-radius:50%;background:#2ecc71;box-shadow:0 0 6px #2ecc71;"></span>ONLINE
+            </div>
+        </div>
+
+        <div style="text-align:center;margin:6px 0 12px;font-size:12px;letter-spacing:3px;color:#9db4d8;font-weight:600;">
+            <span style="color:#3d5a85;">—</span>&nbsp; <b style="color:#cfe0ff;">CLT</b>zinho&nbsp;<span style="letter-spacing:4px;">DIGITAL</span> &nbsp;<span style="color:#3d5a85;">—</span>
+        </div>
+
+        <div id="cr-aviso-slot"></div>
+
+        <div style="background:linear-gradient(135deg,#0d1f3a,#0b1830);border:1px solid #24559b;border-radius:12px;padding:14px 16px;margin-bottom:14px;background-image:repeating-linear-gradient(0deg,rgba(45,125,255,0.05) 0 1px,transparent 1px 22px),repeating-linear-gradient(90deg,rgba(45,125,255,0.05) 0 1px,transparent 1px 22px);">
+            <div style="font-size:16px;font-weight:800;color:#eaf3ff;letter-spacing:1px;margin-bottom:4px;">BEM-VINDO!</div>
+            <div style="font-size:11.5px;color:#8fa8cf;line-height:1.5;">Selecione o robô que deseja iniciar e automatize suas tarefas.</div>
+        </div>
+
+        <div id="cr-lista" style="display:grid;grid-template-columns:1fr 1fr;gap:10px;max-height:44vh;overflow-y:auto;padding-right:6px;"></div>
+
+        <div style="display:flex;align-items:flex-start;justify-content:center;gap:56px;margin:16px 0 6px;">
+            <div id="cr-fechar-app" style="text-align:center;cursor:pointer;">
+                <div style="width:52px;height:52px;margin:0 auto;border-radius:50%;border:2px solid #b91f16;background:radial-gradient(circle at 35% 30%, #1c0d12, #12060a);display:flex;align-items:center;justify-content:center;font-size:22px;color:#ff5040;box-shadow:0 0 12px rgba(226,59,46,0.5);">✖</div>
+                <div style="margin-top:6px;font-size:9.5px;font-weight:700;letter-spacing:1px;color:#e8f1ff;">FECHAR APP</div>
+            </div>
+            <div id="cr-marcador" style="text-align:center;cursor:pointer;">
+                <div id="cr-marcador-icone" style="width:52px;height:52px;margin:0 auto;border-radius:50%;border:2px solid #17a2b8;background:radial-gradient(circle at 35% 30%, #0a1b26, #06121c);display:flex;align-items:center;justify-content:center;font-size:24px;color:#4dc3ff;box-shadow:0 0 12px rgba(23,162,184,0.5);transition:all .25s ease;">☐</div>
+                <div id="cr-marcador-label" style="margin-top:6px;font-size:9.5px;font-weight:700;letter-spacing:.5px;color:#4dc3ff;">marcador de checkboxes</div>
+            </div>
+        </div>
+
+        <div style="text-align:center;font-size:9.5px;color:#3d5a85;">Versão do Sistema 2.1.0</div>
+    `;
+
+    // ── TELA 2: janela de códigos (uma para todos os robôs) ───────
+    const telaJanela = document.createElement('div');
+    telaJanela.id = 'cr-janela';
+    telaJanela.style.cssText = 'display:none;position:relative;padding:14px 16px 14px;';
+    telaJanela.innerHTML = `
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+            <div id="cr-voltar" style="width:34px;height:34px;border-radius:50%;background:#0e1a2e;border:1px solid #223a5e;display:flex;align-items:center;justify-content:center;font-size:16px;color:#cfe0ff;cursor:pointer;flex-shrink:0;">←</div>
+            <div id="cr-j-icone" style="width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:22px;flex-shrink:0;background:linear-gradient(135deg,#2d7dff,#1a5bcc);box-shadow:0 0 12px rgba(45,125,255,0.5);">📝</div>
+            <div style="flex:1;min-width:0;">
+                <div id="cr-j-nome" style="font-size:16px;font-weight:800;color:#eaf3ff;letter-spacing:.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">CONVÊNIO</div>
+                <div id="cr-j-desc" style="font-size:10.5px;color:#8fa8cf;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Automação</div>
+            </div>
+            <div id="cr-j-fechar" style="display:flex;align-items:center;gap:6px;background:#2a0f14;border:1px solid #b91f16;border-radius:16px;padding:6px 12px;font-size:10px;font-weight:800;color:#ff6b5e;letter-spacing:1px;cursor:pointer;flex-shrink:0;">✖ FECHAR</div>
+        </div>
+
+        <div style="background:#0c1830;border:1px solid #1e3a66;border-radius:14px;padding:14px;">
+            <div style="font-size:13.5px;font-weight:800;color:#eaf3ff;letter-spacing:.5px;margin-bottom:4px;">📋 INSERIR CÓDIGOS DO CONVÊNIO</div>
+            <div style="font-size:11px;color:#8fa8cf;margin-bottom:12px;">Cole abaixo a lista de códigos do convênio para iniciar a automação.</div>
+
+            <div style="font-size:10px;font-weight:800;color:#4dc3ff;letter-spacing:1px;margin-bottom:6px;">📋 ÁREA PARA COLAR OS CÓDIGOS</div>
+            <textarea id="cr-txt-codigos" placeholder="Clique aqui e cole os códigos do convênio" style="display:block;width:100%;min-height:150px;box-sizing:border-box;background:#0a1526;border:2px dashed #2d7dff;border-radius:12px;padding:12px;color:#cfe4ff;font-size:12.5px;font-family:Consolas,monospace;resize:vertical;outline:none;"></textarea>
+
+            <div style="background:#0a1424;border:1px solid #1b3157;border-radius:10px;padding:10px 12px;margin-top:12px;">
+                <div style="font-size:10.5px;font-weight:800;color:#4dc3ff;letter-spacing:1px;margin-bottom:5px;">💡 DICAS</div>
+                <div style="font-size:10.5px;color:#9db4d8;line-height:1.7;">
+                    <span style="color:#2ecc71;">✔</span> Você pode colar vários códigos de uma vez.<br>
+                    <span style="color:#2ecc71;">✔</span> Certifique-se de que os códigos estejam corretos antes de iniciar.
+                </div>
+            </div>
+        </div>
+
+        <button id="cr-iniciar" style="display:block;width:100%;margin-top:14px;padding:14px;background:linear-gradient(180deg,#2d7dff,#1a5bcc);color:#fff;border:1px solid #4dc3ff;border-radius:12px;cursor:pointer;font-weight:800;font-size:14px;letter-spacing:1.5px;box-shadow:0 0 16px rgba(45,125,255,0.5);font-family:inherit;">🚀 INICIAR AUTOMAÇÃO</button>
+        <button id="cr-limpar" style="display:block;width:100%;margin-top:8px;padding:11px;background:#0e1a2e;color:#9db4d8;border:1px solid #223a5e;border-radius:12px;cursor:pointer;font-weight:700;font-size:12px;letter-spacing:1.5px;font-family:inherit;">🕐 LIMPAR</button>
+    `;
+
+    menu.appendChild(telaHome);
+    menu.appendChild(telaJanela);
     document.body.appendChild(menu);
 
-    // --- ARRASTAR O PAINEL PELA TELA ---
+    // ── ARRASTAR O PAINEL PELA TELA ───────────────────────────────
     (() => {
         let arrastando = false, dx = 0, dy = 0;
-        menu.style.cursor = 'move';
-
         const mover = ev => {
             if (!arrastando) return;
             const p = ev.touches ? ev.touches[0] : ev;
@@ -81,7 +136,6 @@
             menu.style.top = y + 'px';
             ev.preventDefault();
         };
-
         const parar = () => {
             arrastando = false;
             document.body.style.userSelect = '';
@@ -90,9 +144,8 @@
             document.removeEventListener('touchmove', mover);
             document.removeEventListener('touchend', parar);
         };
-
         const iniciar = ev => {
-            if (ev.target.closest('button, input, textarea, select, a, #botoes-robos')) return;
+            if (ev.target.closest('button, textarea, input, select, a, .cr-card, #cr-fechar-app, #cr-marcador, #cr-voltar, #cr-j-fechar, #cr-lista')) return;
             const p = ev.touches ? ev.touches[0] : ev;
             const r = menu.getBoundingClientRect();
             menu.style.left = r.left + 'px';
@@ -109,48 +162,47 @@
             document.addEventListener('touchend', parar);
             ev.preventDefault();
         };
-
         menu.addEventListener('mousedown', iniciar);
         menu.addEventListener('touchstart', iniciar, { passive: false });
     })();
 
-    // --- FUNCIONALIDADE: MARCAR CHECKBOXES ---
-    const btnCheck = document.getElementById('btn-marcar-checkboxes');
-    const fundoCheck = 'linear-gradient(180deg,#f6a83d,#dd8410)';
-    btnCheck.onmouseover = () => btnCheck.style.background = 'linear-gradient(180deg,#ffc266,#eb9520)';
-    btnCheck.onmouseout = () => btnCheck.style.background = fundoCheck;
-    btnCheck.onclick = () => {
+    // ── MARCADOR DE CHECKBOXES ────────────────────────────────────
+    document.getElementById('cr-marcador').onclick = () => {
         let marcados = 0;
         document.querySelectorAll('input[type=checkbox]').forEach(cb => {
-            if (!cb.checked) { cb.click(); marcados++; }
+            if (!cb.checked && !menu.contains(cb)) { cb.click(); marcados++; }
         });
-        const textoOriginal = '\u2611 Marcar Checkboxes';
-        btnCheck.innerHTML = '\u2705 ' + marcados + ' Marcados!';
-        setTimeout(() => btnCheck.innerHTML = textoOriginal, 2000);
+        const ic = document.getElementById('cr-marcador-icone');
+        const lb = document.getElementById('cr-marcador-label');
+        ic.innerText = '☑';
+        ic.style.color = '#2ecc71';
+        ic.style.borderColor = '#2ecc71';
+        ic.style.boxShadow = '0 0 16px rgba(46,204,113,0.7)';
+        lb.innerText = marcados + ' marcados!';
+        lb.style.color = '#2ecc71';
     };
 
-    // --- SISTEMA DE AVISOS DINÂMICOS ---
+    // ── FECHAR APP ────────────────────────────────────────────────
+    document.getElementById('cr-fechar-app').onclick = () => menu.remove();
+
+    // ── SISTEMA DE AVISOS DINÂMICOS ───────────────────────────────
     const linkDoAviso = "https://raw.githubusercontent.com/sandrolimadf1984/central-robos/main/aviso.txt";
     fetch(linkDoAviso + "?t=" + new Date().getTime())
         .then(response => { if (!response.ok) throw new Error('sem aviso'); return response.text(); })
         .then(texto => {
             if (texto.trim() !== "") {
                 const avisoDiv = document.createElement('div');
-                avisoDiv.style.cssText = `background: #ffcc00; color: #111; padding: 12px 25px 12px 12px; border-radius: 6px; margin-bottom: 15px; font-size: 13px; position: relative; border: 1px solid #cc9900; box-shadow: 0 4px 6px rgba(0,0,0,0.3);`;
+                avisoDiv.style.cssText = `background:#2a2208;color:#ffd633;padding:10px 26px 10px 12px;border-radius:8px;margin-bottom:12px;font-size:11.5px;position:relative;border:1px solid #8a6d00;`;
                 avisoDiv.innerHTML = `
                     <strong>⚠️ ATENÇÃO:</strong><br>
                     ${texto}
-                    <button onclick="this.parentElement.remove()" style="position: absolute; top: 4px; right: 4px; background: transparent; border: none; color: #111; font-weight: bold; cursor: pointer; font-size: 16px;">✖</button>
+                    <button onclick="this.parentElement.remove()" style="position:absolute;top:4px;right:6px;background:transparent;border:none;color:#ffd633;font-weight:bold;cursor:pointer;font-size:14px;">✖</button>
                 `;
-                menu.querySelector('h2').insertAdjacentElement('afterend', avisoDiv);
+                document.getElementById('cr-aviso-slot').appendChild(avisoDiv);
             }
         })
         .catch(erro => console.log("Sem avisos no momento."));
 
-    // Fechar menu
-    document.getElementById('fechar-menu-central').onclick = () => menu.remove();
-
-    // 3. Dicionário com os scripts ATUALIZADOS
     const robos = {
         "PLANASSISTE MPU": () => {
             (function(){
@@ -1749,37 +1801,151 @@
         })();
     },
     };
+    // ── FICHA DE CADA CONVÊNIO (ícone, cor, descrição, modo de entrega) ──
+    const infoRobos = {
+        "AFFEGO":           { icone: "🛠️", cor: "#378ADD", desc: "Automação para Fisco e Convênios Affego",        modo: "prompt" },
+        "AMIL":             { icone: "🩺", cor: "#2ecc71", desc: "Automação para Rede Credenciada Amil",           modo: "painel", txt: "tc",            btn: "bi" },
+        "INAS":             { icone: "🤝", cor: "#d9a520", desc: "Automação para Convênios Inas GDF",              modo: "painel", txt: "g-codes",       btn: "g-start" },
+        "MEDSENIOR/UN SEG": { icone: "🏥", cor: "#27ae60", desc: "Automação para Planos de Saúde",                 modo: "painel", txt: "txtInput",      btn: "btnRun" },
+        "MPLAN_10_DIGITOS": { icone: "🔟", cor: "#9b59b6", desc: "Automação para Convênios MPlan (10 dígitos)",    modo: "painel", txt: "g-txt-mplan10", btn: "g-btn-mplan10" },
+        "PLANASSISTE MPU":  { icone: "📝", cor: "#2d7dff", desc: "Automação para Planilhas do MPU",                modo: "painel", txt: "rc",            btn: "rb" },
+        "PLENUM":           { icone: "⚖️", cor: "#8e44ad", desc: "Automação para Convênios de Advocacia e Justiça",modo: "painel", txt: "plenum-txt",    btn: "plenum-btn" },
+        "PM/STJ":           { icone: "🛡️", cor: "#5dade2", desc: "Automação para Segurança e Justiça Superior",    modo: "prompt" },
+        "POSTAL":           { icone: "✉️", cor: "#d4ac0d", desc: "Automação para Logística Postal",                modo: "prompt" },
+        "SULAMERICA":       { icone: "🌎", cor: "#e74c3c", desc: "Automação para Convênios Sulamerica",            modo: "prompt" },
+        "TJDF":             { icone: "🏛️", cor: "#e67e22", desc: "Automação para Tribunal de Justiça do DF",       modo: "painel", txt: "b403-input",    btn: "b403-iniciar" },
+        "TRE":              { icone: "🗳️", cor: "#7f9fc4", desc: "Automação para Tribunal Regional Eleitoral",     modo: "prompt" },
+        "TRF":              { icone: "📖", cor: "#1d9e75", desc: "Automação para Tribunal Regional Federal",       modo: "prompt" },
+        "TRT":              { icone: "🤝", cor: "#e67e22", desc: "Automação para Tribunal Regional do Trabalho",   modo: "painel", txt: "g-txt",         btn: "g-btn" },
+        "TST":              { icone: "🔨", cor: "#e24b4a", desc: "Automação para Tribunal Superior do Trabalho",   modo: "tst" }
+    };
 
-    // 4. Injeta os botões na janela central
-    const container = document.getElementById('botoes-robos');
-    for (const [nome, func] of Object.entries(robos)) {
-        const btn = document.createElement('button');
-        btn.textContent = nome;
-        const fundoBtn = 'linear-gradient(180deg,#ffe27a 0%,#f4c62e 55%,#e9b31f 100%)';
-        btn.style.cssText = `
-            padding: 13px 16px;
-            background: ${fundoBtn};
-            color: #7a0e0e;
-            border: 2px solid #d49b1c;
-            border-radius: 28px;
+    // ── PONTE: entrega os códigos colados para o robô escolhido ───
+    const executarRobo = (nome, texto) => {
+        const info = infoRobos[nome] || { modo: "prompt" };
+        const func = robos[nome];
+        if (!func) { alert("Robô não encontrado: " + nome); return; }
+
+        if (info.modo === "prompt") {
+            const promptOriginal = window.prompt;
+            window.prompt = () => texto;
+            try { func(); } finally { window.prompt = promptOriginal; }
+            return;
+        }
+
+        if (info.modo === "tst") {
+            let janelaCapturada = null;
+            const openOriginal = window.open;
+            window.open = function () {
+                janelaCapturada = openOriginal.apply(window, arguments);
+                return janelaCapturada;
+            };
+            try {
+                func();
+                const botoes = Array.from(document.querySelectorAll('button'))
+                    .filter(b => (b.innerText || '').includes('ROBÔ EQUILIBRADO'));
+                if (botoes.length) botoes[botoes.length - 1].click();
+            } finally {
+                window.open = openOriginal;
+            }
+            let tent = 0;
+            const espera = setInterval(() => {
+                try {
+                    if (janelaCapturada && janelaCapturada.document && janelaCapturada.document.getElementById('t')) {
+                        clearInterval(espera);
+                        janelaCapturada.document.getElementById('t').value = texto;
+                        janelaCapturada.go();
+                        return;
+                    }
+                } catch (e) { }
+                if (++tent > 40) clearInterval(espera);
+            }, 200);
+            return;
+        }
+
+        // modo "painel": roda o robô, espera o painel dele nascer, cola e clica em iniciar
+        func();
+        let tent = 0;
+        const espera = setInterval(() => {
+            const ta = document.getElementById(info.txt);
+            const bt = document.getElementById(info.btn);
+            if (ta && bt) {
+                clearInterval(espera);
+                ta.value = texto;
+                ta.dispatchEvent(new Event('input', { bubbles: true }));
+                ta.dispatchEvent(new Event('change', { bubbles: true }));
+                setTimeout(() => bt.click(), 200);
+            } else if (++tent > 50) {
+                clearInterval(espera);
+                alert('O painel do robô ' + nome + ' não abriu. Tente novamente.');
+            }
+        }, 150);
+    };
+
+    // ── NAVEGAÇÃO ENTRE AS DUAS TELAS ─────────────────────────────
+    let roboAtual = null;
+    const abrirJanelaCodigos = nome => {
+        roboAtual = nome;
+        const info = infoRobos[nome] || {};
+        document.getElementById('cr-j-nome').innerText = nome;
+        document.getElementById('cr-j-desc').innerText = info.desc || 'Automação';
+        const ic = document.getElementById('cr-j-icone');
+        ic.innerText = info.icone || '🤖';
+        ic.style.background = 'linear-gradient(135deg,' + (info.cor || '#2d7dff') + 'cc,' + (info.cor || '#2d7dff') + '66)';
+        ic.style.boxShadow = '0 0 12px ' + (info.cor || '#2d7dff') + '80';
+        document.getElementById('cr-txt-codigos').value = '';
+        telaHome.style.display = 'none';
+        telaJanela.style.display = 'block';
+    };
+
+    document.getElementById('cr-voltar').onclick = () => {
+        telaJanela.style.display = 'none';
+        telaHome.style.display = 'block';
+    };
+    document.getElementById('cr-j-fechar').onclick = () => menu.remove();
+    document.getElementById('cr-limpar').onclick = () => {
+        document.getElementById('cr-txt-codigos').value = '';
+        document.getElementById('cr-txt-codigos').focus();
+    };
+    document.getElementById('cr-iniciar').onclick = () => {
+        const texto = document.getElementById('cr-txt-codigos').value;
+        if (!texto.trim()) {
+            alert('Cole os códigos do convênio antes de iniciar!');
+            return;
+        }
+        const nome = roboAtual;
+        menu.remove();
+        executarRobo(nome, texto);
+    };
+
+    // ── CARDS DOS CONVÊNIOS (ordem alfabética) ────────────────────
+    const container = document.getElementById('cr-lista');
+    const nomesOrdenados = Object.keys(robos).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+    for (const nome of nomesOrdenados) {
+        const info = infoRobos[nome] || { icone: '🤖', cor: '#2d7dff', desc: 'Automação' };
+        const card = document.createElement('div');
+        card.className = 'cr-card';
+        card.style.cssText = `
+            position: relative;
+            background: #10182b;
+            border: 1px solid #1e2a44;
+            border-radius: 12px;
+            padding: 12px 12px 14px;
             cursor: pointer;
-            font-weight: 800;
-            font-size: 14px;
-            font-family: Georgia, 'Times New Roman', serif;
-            text-align: center;
-            letter-spacing: .3px;
-            box-shadow: 0 3px 5px rgba(0,0,0,0.4), inset 0 1px 0 rgba(255,255,255,0.6);
             transition: all .15s ease;
         `;
-        // Efeito de Hover visual
-        btn.onmouseover = () => { btn.style.background = 'linear-gradient(180deg,#fff0a8,#f8d24a)'; btn.style.transform = 'translateY(-1px)'; };
-        btn.onmouseout = () => { btn.style.background = fundoBtn; btn.style.transform = 'none'; };
-        
-        // Ação ao clicar: Fecha o menu central e roda o código original
-        btn.onclick = () => {
-            menu.remove();
-            func();
-        };
-        container.appendChild(btn);
+        card.innerHTML = `
+            <div style="display:flex;align-items:flex-start;gap:9px;">
+                <div style="width:38px;height:38px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:19px;background:linear-gradient(135deg,${info.cor}cc,${info.cor}55);box-shadow:0 0 10px ${info.cor}55;">${info.icone}</div>
+                <div style="flex:1;min-width:0;">
+                    <div style="font-size:12px;font-weight:800;color:#eaf3ff;line-height:1.25;word-break:break-word;">${nome}</div>
+                    <div style="font-size:9.5px;color:#8fa8cf;line-height:1.4;margin-top:3px;">${info.desc}</div>
+                </div>
+                <div class="cr-seta" style="width:22px;height:22px;border-radius:50%;flex-shrink:0;background:#0e1a2e;border:1px solid #223a5e;display:flex;align-items:center;justify-content:center;font-size:11px;color:#cfe0ff;transition:all .15s ease;align-self:center;">›</div>
+            </div>
+            <div style="position:absolute;bottom:8px;left:14px;width:26px;height:3px;border-radius:2px;background:${info.cor};"></div>
+        `;
+        card.onclick = () => abrirJanelaCodigos(nome);
+        container.appendChild(card);
     }
 })();
