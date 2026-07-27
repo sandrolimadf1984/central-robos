@@ -174,6 +174,7 @@
 
         <button id="cr-iniciar" style="display:block;width:100%;margin-top:14px;padding:14px;background:linear-gradient(180deg,#2d7dff,#1a5bcc);color:#fff;border:1px solid #4dc3ff;border-radius:12px;cursor:pointer;font-weight:800;font-size:14px;letter-spacing:1.5px;box-shadow:0 0 16px rgba(45,125,255,0.5);font-family:inherit;">🚀 INICIAR AUTOMAÇÃO</button>
         <button id="cr-limpar" style="display:block;width:100%;margin-top:8px;padding:11px;background:#0e1a2e;color:#9db4d8;border:1px solid #223a5e;border-radius:12px;cursor:pointer;font-weight:700;font-size:12px;letter-spacing:1.5px;font-family:inherit;">🕐 LIMPAR</button>
+        <div id="cr-exec-status" style="display:none;margin-top:10px;background:#0a1424;border:1px solid #1b3157;border-radius:10px;padding:10px 12px;font-size:11px;color:#9db4d8;line-height:1.5;text-align:center;min-height:16px;"></div>
     `;
 
     menu.appendChild(telaHome);
@@ -1844,6 +1845,37 @@
         "TST":              { icone: "🔨", cor: "#e24b4a", desc: "Automação para Tribunal Superior do Trabalho",   modo: "tst" }
     };
 
+    // ── ONDE CADA ROBÔ MOSTRA O PROGRESSO DELE ───────────────────
+    const statusRobo = {
+        "AMIL": "lg",
+        "INAS": "g-status",
+        "MEDSENIOR/UN SEG": "statusLog",
+        "PLANASSISTE MPU": "rs",
+        "PLENUM": "plenum-status",
+        "TJDF": "b403-status",
+        "TRT": "g-status"
+    };
+
+    // ── ESTADO DA EXECUÇÃO ────────────────────────────────────────
+    let rodando = false;
+    let elementosRobo = [];
+    let janelasRobo = [];
+    let vigias = [];
+
+    // Tira o painel do robô da frente sem desligá-lo (ele continua clicável por código)
+    const esconderElemento = el => {
+        try {
+            el.style.setProperty('position', 'fixed', 'important');
+            el.style.setProperty('left', '-20000px', 'important');
+            el.style.setProperty('top', '0px', 'important');
+            el.style.setProperty('right', 'auto', 'important');
+            el.style.setProperty('bottom', 'auto', 'important');
+            el.style.setProperty('opacity', '0', 'important');
+            el.style.setProperty('pointer-events', 'none', 'important');
+            el.style.setProperty('z-index', '-1', 'important');
+        } catch (e) { }
+    };
+
     // ── PONTE: entrega os códigos colados para o robô escolhido ───
     const executarRobo = (nome, texto) => {
         const info = infoRobos[nome] || { modo: "prompt" };
@@ -1852,8 +1884,17 @@
 
         if (info.modo === "prompt") {
             const promptOriginal = window.prompt;
+            const openOriginal = window.open;
             window.prompt = () => texto;
-            try { func(); } finally { window.prompt = promptOriginal; }
+            window.open = function () {
+                const w = openOriginal.apply(window, arguments);
+                if (w) janelasRobo.push(w);
+                return w;
+            };
+            try { func(); } finally {
+                window.prompt = promptOriginal;
+                window.open = openOriginal;
+            }
             return;
         }
 
@@ -1862,6 +1903,7 @@
             const openOriginal = window.open;
             window.open = function () {
                 janelaCapturada = openOriginal.apply(window, arguments);
+                if (janelaCapturada) janelasRobo.push(janelaCapturada);
                 return janelaCapturada;
             };
             try {
@@ -1884,6 +1926,7 @@
                 } catch (e) { }
                 if (++tent > 40) clearInterval(espera);
             }, 200);
+            vigias.push(espera);
             return;
         }
 
@@ -1904,11 +1947,127 @@
                 alert('O painel do robô ' + nome + ' não abriu. Tente novamente.');
             }
         }, 150);
+        vigias.push(espera);
     };
 
     // ── NAVEGAÇÃO ENTRE AS DUAS TELAS ─────────────────────────────
     let roboAtual = null;
+    const btnIniciar = document.getElementById('cr-iniciar');
+    const btnLimpar = document.getElementById('cr-limpar');
+    const campoCodigos = document.getElementById('cr-txt-codigos');
+    const statusExec = document.getElementById('cr-exec-status');
+
+    const mostrarStatus = (texto, cor) => {
+        statusExec.style.display = 'block';
+        statusExec.innerText = texto;
+        statusExec.style.color = cor || '#9db4d8';
+    };
+
+    const modoIniciar = () => {
+        btnIniciar.innerHTML = '🚀 INICIAR AUTOMAÇÃO';
+        btnIniciar.style.background = 'linear-gradient(180deg,#2d7dff,#1a5bcc)';
+        btnIniciar.style.borderColor = '#4dc3ff';
+        btnIniciar.style.boxShadow = '0 0 16px rgba(45,125,255,0.5)';
+        btnLimpar.style.display = 'block';
+        campoCodigos.disabled = false;
+    };
+
+    const modoParar = () => {
+        btnIniciar.innerHTML = '⏹ PARAR';
+        btnIniciar.style.background = 'linear-gradient(180deg,#e23b2e,#b91f16)';
+        btnIniciar.style.borderColor = '#ff6b5e';
+        btnIniciar.style.boxShadow = '0 0 16px rgba(226,59,46,0.5)';
+        btnLimpar.style.display = 'none';
+        campoCodigos.disabled = true;
+    };
+
+    const limparVigias = () => {
+        vigias.forEach(v => { try { clearInterval(v); } catch (e) { } });
+        vigias = [];
+    };
+
+    // ── INICIAR: roda o robô sem sair desta janela ────────────────
+    const iniciarAutomacao = (nome, texto) => {
+        rodando = true;
+        elementosRobo = [];
+        janelasRobo = [];
+        modoParar();
+        mostrarStatus('▶ Iniciando automação...', '#4dc3ff');
+
+        const antes = new Set(Array.from(document.body.children));
+        executarRobo(nome, texto);
+
+        // Vigia os painéis que o robô cria e tira eles da frente
+        let ciclos = 0;
+        const idStatus = statusRobo[nome];
+        const vigia = setInterval(() => {
+            if (!rodando) { clearInterval(vigia); return; }
+
+            Array.from(document.body.children).forEach(el => {
+                if (el !== menu && !antes.has(el) && elementosRobo.indexOf(el) === -1) {
+                    elementosRobo.push(el);
+                    esconderElemento(el);
+                }
+            });
+
+            // Espelha o progresso do robô aqui dentro
+            if (idStatus) {
+                const alvo = document.getElementById(idStatus);
+                if (alvo) {
+                    const txt = (alvo.innerText || '').trim();
+                    if (txt) {
+                        mostrarStatus(txt, '#4dc3ff');
+                        if (/✅|conclu|finaliz|FIM/i.test(txt)) {
+                            rodando = false;
+                            clearInterval(vigia);
+                            limparVigias();
+                            modoIniciar();
+                            mostrarStatus('✅ Automação concluída!', '#2ecc71');
+                            return;
+                        }
+                    }
+                }
+            } else if (ciclos === 3) {
+                mostrarStatus('▶ Automação em andamento no portal...', '#4dc3ff');
+            }
+
+            if (++ciclos > 7200) clearInterval(vigia);
+        }, 400);
+        vigias.push(vigia);
+    };
+
+    // ── PARAR: desliga o que der e devolve o botão ao normal ──────
+    const pararAutomacao = () => {
+        const tinhaJanela = janelasRobo.length > 0;
+        const tinhaPainel = elementosRobo.length > 0;
+
+        rodando = false;
+        limparVigias();
+
+        janelasRobo.forEach(w => { try { w.close(); } catch (e) { } });
+        janelasRobo = [];
+        elementosRobo.forEach(el => { try { el.remove(); } catch (e) { } });
+        elementosRobo = [];
+        try { window._b403 = 0; } catch (e) { }
+
+        modoIniciar();
+
+        if (!tinhaJanela && !tinhaPainel) {
+            // Robô que roda direto na página: só recarregando para de vez
+            mostrarStatus('⏹ Para interromper este robô é preciso recarregar a página.', '#ffd633');
+            if (confirm('Este convênio roda direto na página do portal.\n\nPara interromper de verdade é preciso recarregar a página (você perderá o que estiver preenchido).\n\nRecarregar agora?')) {
+                location.reload();
+            }
+            return;
+        }
+        mostrarStatus('⏹ Automação interrompida.', '#ff6b5e');
+    };
+
     const abrirJanelaCodigos = item => {
+        if (rodando) {
+            alert('Há uma automação em andamento. Pare ela antes de escolher outro convênio.');
+            return;
+        }
         roboAtual = item.chave;
         document.getElementById('cr-j-nome').innerText = item.rotulo;
         document.getElementById('cr-j-desc').innerText = item.desc;
@@ -1916,7 +2075,9 @@
         ic.innerText = item.icone;
         ic.style.background = 'linear-gradient(135deg,' + item.cor + 'cc,' + item.cor + '66)';
         ic.style.boxShadow = '0 0 12px ' + item.cor + '80';
-        document.getElementById('cr-txt-codigos').value = '';
+        campoCodigos.value = '';
+        statusExec.style.display = 'none';
+        modoIniciar();
         telaHome.style.display = 'none';
         telaJanela.style.display = 'block';
     };
@@ -1926,19 +2087,18 @@
         telaHome.style.display = 'flex';
     };
     document.getElementById('cr-j-fechar').onclick = () => menu.remove();
-    document.getElementById('cr-limpar').onclick = () => {
-        document.getElementById('cr-txt-codigos').value = '';
-        document.getElementById('cr-txt-codigos').focus();
+    btnLimpar.onclick = () => {
+        campoCodigos.value = '';
+        campoCodigos.focus();
     };
-    document.getElementById('cr-iniciar').onclick = () => {
-        const texto = document.getElementById('cr-txt-codigos').value;
+    btnIniciar.onclick = () => {
+        if (rodando) { pararAutomacao(); return; }
+        const texto = campoCodigos.value;
         if (!texto.trim()) {
             alert('Cole os códigos do convênio antes de iniciar!');
             return;
         }
-        const nome = roboAtual;
-        menu.remove();
-        executarRobo(nome, texto);
+        iniciarAutomacao(roboAtual, texto);
     };
 
     // ── CARDS DOS CONVÊNIOS (ordem alfabética, nomes de exibição) ─
