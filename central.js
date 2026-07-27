@@ -2403,8 +2403,10 @@
     const BASE_ID = 900000000;
     let motor = {
         som: null, relogio: null, rtc: null, ligado: false, originais: null,
-        tarefas: new Map(), seq: 0, girando: false, alvo: 0, canal: null, diag: []
+        tarefas: new Map(), seq: 0, girando: false, alvo: 0, canal: null, diag: [],
+        ultimoPulso: 0, guarda: null, backup: null
     };
+    let dialogos = null;
 
     // ── Som inaudível: a aba passa a contar como "tocando algo" ────
     //    (grave demais para o alto-falante reproduzir, mas o Chrome vê)
@@ -2505,6 +2507,7 @@
     const pulso = () => {
         if (!motor.ligado) return;
         const agora = Date.now();
+        motor.ultimoPulso = agora;
         const vencidas = [];
         motor.tarefas.forEach((t, id) => {
             if (agora >= t.prox) {
@@ -2581,10 +2584,33 @@
         };
 
         motor.ligado = true;
+        motor.ultimoPulso = Date.now();
+
+        // Batida de reserva: garante que os relógios da página NUNCA morram,
+        // mesmo que a placa de som e o reforço falhem os dois.
+        motor.backup = siO.call(window, pulso, 200);
+
+        // Vigia: se as batidas pararem, aciona o reforço na hora
+        motor.guarda = siO.call(window, () => {
+            if (!motor.ligado) return;
+            if (Date.now() - motor.ultimoPulso > 2000) {
+                if (motor.relogio) {
+                    desligarRelogioSom();
+                    motor.diag = motor.diag.map(d => d.indexOf('relógio') === 0
+                        ? 'relógio da placa ⚠️ parou → reforço ativo' : d);
+                }
+                motor.girando = false;
+                agendarPulso();
+            }
+        }, 1000);
+
         agendarPulso();
     };
 
     const desligarMotorFundo = () => {
+        try { motor.originais && motor.originais.ciO.call(window, motor.backup); } catch (e) { }
+        try { motor.originais && motor.originais.ciO.call(window, motor.guarda); } catch (e) { }
+        motor.backup = null; motor.guarda = null;
         desligarRelogioSom();
         desligarSom();
         desligarConexaoViva();
@@ -2724,8 +2750,8 @@
         elementosRobo = [];
         janelasRobo = [];
         modoParar();
-        ligarMotorFundo();
-        silenciarAvisos();
+        try { ligarMotorFundo(); } catch (e) { console.log('motor de fundo indisponível:', e.message); }
+        try { silenciarAvisos(); } catch (e) { console.log('aviso:', e.message); }
         mostrarStatus('▶ Iniciando... pode minimizar ou trocar de aba.\n⚙️ ' + motor.diag.join(' · '), '#4dc3ff');
 
         if (roboInline[nome]) { rodarInline(nome, texto); return; }
