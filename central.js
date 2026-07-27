@@ -318,7 +318,7 @@
     };
 
     // ── FECHAR APP ────────────────────────────────────────────────
-    document.getElementById('cr-fechar-app').onclick = () => menu.remove();
+    document.getElementById('cr-fechar-app').onclick = () => menu.remove();  // motor é desligado ao parar/concluir
 
     // ── SISTEMA DE AVISOS DINÂMICOS ───────────────────────────────
     const linkDoAviso = "https://raw.githubusercontent.com/sandrolimadf1984/central-robos/main/aviso.txt";
@@ -2392,6 +2392,138 @@
         vigias = [];
     };
 
+    // ═══════════════════════════════════════════════════════════════
+    //  MOTOR DE FUNDO
+    //  O Chrome desacelera (e quase congela) os relógios de uma aba
+    //  que não está na frente. Isso faria o robô andar a passo de
+    //  tartaruga com a aba minimizada. Aqui o relógio passa a bater
+    //  fora da aba, num processo paralelo que o Chrome não freia.
+    // ═══════════════════════════════════════════════════════════════
+    const BASE_ID = 900000000;
+    let motor = { worker: null, som: null, ligado: false, tarefas: new Map(), seq: 0, originais: null };
+    let dialogos = null;
+
+    const ligarSomSilencioso = () => {
+        try {
+            if (motor.som) return;
+            const AC = window.AudioContext || window.webkitAudioContext;
+            if (!AC) return;
+            const ac = new AC();
+            const osc = ac.createOscillator();
+            const vol = ac.createGain();
+            vol.gain.value = 0.0015;
+            osc.frequency.value = 20;
+            osc.connect(vol);
+            vol.connect(ac.destination);
+            osc.start();
+            if (ac.state === 'suspended') ac.resume();
+            motor.som = { ac, osc };
+        } catch (e) { }
+    };
+
+    const desligarSomSilencioso = () => {
+        try {
+            if (!motor.som) return;
+            motor.som.osc.stop();
+            motor.som.ac.close();
+        } catch (e) { }
+        motor.som = null;
+    };
+
+    const ligarMotorFundo = () => {
+        ligarSomSilencioso();
+        if (motor.ligado) return;
+
+        if (!motor.worker) {
+            try {
+                const fonte = 'var t={};self.onmessage=function(e){var d=e.data;' +
+                    'if(d.tipo==="i"){t[d.id]=setInterval(function(){self.postMessage({id:d.id});},d.ms);}' +
+                    'else if(d.tipo==="t"){t[d.id]=setTimeout(function(){self.postMessage({id:d.id,u:1});delete t[d.id];},d.ms);}' +
+                    'else if(d.tipo==="c"){clearInterval(t[d.id]);clearTimeout(t[d.id]);delete t[d.id];}};';
+                const blob = new Blob([fonte], { type: 'application/javascript' });
+                const w = new Worker(URL.createObjectURL(blob));
+                w.onmessage = ev => {
+                    const reg = motor.tarefas.get(ev.data.id);
+                    if (!reg) return;
+                    if (ev.data.u) motor.tarefas.delete(ev.data.id);
+                    try { reg.fn.apply(null, reg.args); } catch (e) { }
+                };
+                motor.worker = w;
+            } catch (e) {
+                motor.worker = null;   // portal bloqueou: fica só o som segurando a aba acordada
+            }
+        }
+        if (!motor.worker) return;
+
+        const stO = window.setTimeout, siO = window.setInterval;
+        const ctO = window.clearTimeout, ciO = window.clearInterval;
+        motor.originais = { stO, siO, ctO, ciO };
+
+        const agendar = (tipo, fn, ms, args) => {
+            if (typeof fn !== 'function') {
+                return tipo === 'i' ? siO(fn, ms) : stO(fn, ms);
+            }
+            const id = BASE_ID + (++motor.seq);
+            motor.tarefas.set(id, { fn: fn, args: args || [] });
+            motor.worker.postMessage({ tipo: tipo, id: id, ms: ms || 0 });
+            return id;
+        };
+
+        window.setTimeout = function (fn, ms) { return agendar('t', fn, ms, [].slice.call(arguments, 2)); };
+        window.setInterval = function (fn, ms) { return agendar('i', fn, ms, [].slice.call(arguments, 2)); };
+        window.clearTimeout = function (id) {
+            if (typeof id === 'number' && id >= BASE_ID) {
+                motor.tarefas.delete(id);
+                motor.worker.postMessage({ tipo: 'c', id: id });
+                return;
+            }
+            return ctO(id);
+        };
+        window.clearInterval = function (id) {
+            if (typeof id === 'number' && id >= BASE_ID) {
+                motor.tarefas.delete(id);
+                motor.worker.postMessage({ tipo: 'c', id: id });
+                return;
+            }
+            return ciO(id);
+        };
+        motor.ligado = true;
+    };
+
+    const desligarMotorFundo = () => {
+        desligarSomSilencioso();
+        if (!motor.ligado || !motor.originais) return;
+        window.setTimeout = motor.originais.stO;
+        window.setInterval = motor.originais.siO;
+        window.clearTimeout = motor.originais.ctO;
+        window.clearInterval = motor.originais.ciO;
+        motor.ligado = false;
+    };
+
+    // Avisos do robô não podem travar a aba quando ela está no fundo:
+    // em vez de caixinha do navegador, a mensagem aparece aqui no painel.
+    const silenciarAvisos = () => {
+        if (dialogos) return;
+        dialogos = { alerta: window.alert, pergunta: window.confirm };
+        window.alert = msg => mostrarStatus(String(msg), '#4dc3ff');
+        window.confirm = msg => {
+            mostrarStatus('⚠️ ' + String(msg) + ' → seguindo em frente automaticamente', '#ffd633');
+            return true;
+        };
+    };
+
+    const restaurarAvisos = () => {
+        if (!dialogos) return;
+        window.alert = dialogos.alerta;
+        window.confirm = dialogos.pergunta;
+        dialogos = null;
+    };
+
+    const encerrarModoAutomacao = () => {
+        restaurarAvisos();
+        desligarMotorFundo();
+    };
+
     // ── CAMINHO PADRÃO: robôs que já rodam na própria página ──────
     const iniciarPadrao = (nome, texto) => {
         const antes = new Set(Array.from(document.body.children));
@@ -2419,6 +2551,7 @@
                             rodando = false;
                             clearInterval(vigia);
                             limparVigias();
+                            encerrarModoAutomacao();
                             modoIniciar();
                             mostrarStatus('✅ Automação concluída!', '#2ecc71');
                             return;
@@ -2449,6 +2582,7 @@
             fim: () => {
                 rodando = false;
                 limparVigias();
+                encerrarModoAutomacao();
                 modoIniciar();
                 mostrarStatus('✅ Automação concluída! O portal continua aqui na tela.', '#2ecc71');
             }
@@ -2492,7 +2626,9 @@
         elementosRobo = [];
         janelasRobo = [];
         modoParar();
-        mostrarStatus('▶ Iniciando automação...', '#4dc3ff');
+        ligarMotorFundo();
+        silenciarAvisos();
+        mostrarStatus('▶ Iniciando... (pode minimizar ou trocar de aba à vontade)', '#4dc3ff');
 
         if (roboInline[nome]) { rodarInline(nome, texto); return; }
         iniciarPadrao(nome, texto);
@@ -2506,6 +2642,7 @@
 
         rodando = false;
         limparVigias();
+        encerrarModoAutomacao();
 
         janelasRobo.forEach(w => { try { w.close(); } catch (e) { } });
         janelasRobo = [];
@@ -2554,7 +2691,7 @@
         telaJanela.style.display = 'none';
         telaHome.style.display = 'flex';
     };
-    document.getElementById('cr-j-fechar').onclick = () => menu.remove();
+    document.getElementById('cr-j-fechar').onclick = () => { encerrarModoAutomacao(); menu.remove(); };
     btnLimpar.onclick = () => {
         campoCodigos.value = '';
         campoCodigos.focus();
