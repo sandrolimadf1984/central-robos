@@ -1950,6 +1950,412 @@
         vigias.push(espera);
     };
 
+    // ═══════════════════════════════════════════════════════════════
+    //  MODO ESPELHO — coloca o portal dentro de uma moldura na própria
+    //  página e o robô pilota daqui. Substitui a janelinha separada.
+    //  Se a moldura não carregar, cai de volta no método antigo.
+    // ═══════════════════════════════════════════════════════════════
+    let espelho = null;
+
+    const abrirEspelho = () => {
+        if (espelho) return espelho.iframe;
+        const url = window.location.href;
+        const escondidos = [];
+        Array.from(document.body.children).forEach(el => {
+            if (el !== menu) {
+                escondidos.push([el, el.style.display]);
+                el.style.display = 'none';
+            }
+        });
+        const iframe = document.createElement('iframe');
+        iframe.id = 'cr-espelho';
+        iframe.src = url;
+        iframe.style.cssText = 'position:fixed;top:0;left:0;width:100vw;height:100vh;border:none;z-index:1;background:#fff;';
+        document.body.appendChild(iframe);
+        const margemAntes = document.body.style.margin;
+        const overflowAntes = document.body.style.overflow;
+        document.body.style.margin = '0';
+        document.body.style.overflow = 'hidden';
+        espelho = { iframe, escondidos, margemAntes, overflowAntes };
+        return iframe;
+    };
+
+    const fecharEspelho = () => {
+        if (!espelho) return;
+        try { espelho.iframe.remove(); } catch (e) { }
+        espelho.escondidos.forEach(par => { try { par[0].style.display = par[1] || ''; } catch (e) { } });
+        document.body.style.margin = espelho.margemAntes || '';
+        document.body.style.overflow = espelho.overflowAntes || '';
+        espelho = null;
+    };
+
+    // ── ROBÔS QUE RODAM NA PRÓPRIA JANELA (sem abrir outra) ───────
+    const roboInline = {
+
+        "POSTAL": (texto, ctx) => {
+            var raw = texto.match(/\b\d{8}\b/g);
+            if (!raw) { alert("Sem códigos!"); ctx.fim(); return; }
+            var counts = {};
+            raw.forEach(x => counts[x] = (counts[x] || 0) + 1);
+            var unicos = [...new Set(raw)];
+            var order = unicos.filter(c => counts[c] === 1).concat(unicos.filter(c => counts[c] > 1));
+            var lista = order.map(k => ({ cod: k, qtd: counts[k] }));
+            var selInp = "#FormMain > table > tbody > tr:nth-child(1) > td.frm_cell_field > table > tbody > tr > td:nth-child(1) > input.frm_field_lkp_big";
+            var selQtd = "#FormMain > table > tbody > tr:nth-child(3) > td:nth-child(4) > input";
+            var selBtn = "body > table > tbody > tr:nth-child(1) > td > div > table > tbody > tr:nth-child(2) > td > table > tbody > tr > td:nth-child(2) > table > tbody > tr > td > table > tbody > tr > td > table > tbody > tr:nth-child(1) > td > div > div.act_box > div > div > div > div:nth-child(2) > a > nobr";
+            var selBtnFinalizar = "body > table > tbody > tr:nth-child(1) > td > div > table > tbody > tr:nth-child(2) > td > table > tbody > tr > td:nth-child(2) > table > tbody > tr > td > table > tbody > tr > td > table > tbody > tr:nth-child(1) > td > div > div.act_box > div > div > div > div:nth-child(3) > a";
+            var idx = 0;
+            var t = setInterval(function () {
+                if (!ctx.ativo()) { clearInterval(t); return; }
+                if (idx >= lista.length) {
+                    clearInterval(t);
+                    ctx.status("✅ FIM DO LOTE!");
+                    ctx.fim();
+                    return;
+                }
+                try {
+                    var doc = ctx.doc();
+                    var inp = doc.querySelector(selInp);
+                    if (inp && inp.value == "") {
+                        var item = lista[idx];
+                        var c = item.cod;
+                        var q = item.qtd;
+                        var ehUltimo = (idx === lista.length - 1);
+                        ctx.status("Lançando: " + c + " (" + (idx + 1) + "/" + lista.length + ")" + (q > 1 ? " Qtd: " + q : ""));
+                        inp.focus();
+                        inp.value = c;
+                        inp.dispatchEvent(new Event('input', { bubbles: true }));
+                        inp.dispatchEvent(new Event('change', { bubbles: true }));
+                        if (q > 1) {
+                            var qInp = doc.querySelector(selQtd);
+                            if (qInp) {
+                                qInp.value = q;
+                                qInp.dispatchEvent(new Event('input', { bubbles: true }));
+                                qInp.dispatchEvent(new Event('change', { bubbles: true }));
+                            }
+                        }
+                        setTimeout(function () {
+                            if (!ctx.ativo()) return;
+                            try {
+                                var d2 = ctx.doc();
+                                var btn = ehUltimo ? d2.querySelector(selBtnFinalizar) : d2.querySelector(selBtn);
+                                if (btn) {
+                                    btn.click();
+                                    idx++;
+                                    ctx.status(ehUltimo ? "Finalizando lote..." : "Salvando... aguarde.");
+                                } else {
+                                    ctx.status("ERRO: Botão sumiu!");
+                                }
+                            } catch (e) { }
+                        }, 800);
+                    }
+                } catch (e) {
+                    ctx.status("Aguardando página...");
+                }
+            }, 1500);
+            ctx.timer(t);
+        },
+
+        "TRF": (texto, ctx) => {
+            var cods = texto.match(/\b\d{8}\b/g);
+            if (!cods) { alert("Nenhum código!"); ctx.fim(); return; }
+            var counts = {};
+            cods.forEach(function (c) { counts[c] = (counts[c] || 0) + 1; });
+            var unicos = [...new Set(cods)];
+            var lista = unicos.filter(function (c) { return counts[c] === 1; })
+                .concat(unicos.filter(function (c) { return counts[c] > 1; }));
+            var selCod = "#FormMain > table > tbody > tr:nth-child(2) > td:nth-child(2) > table > tbody > tr > td:nth-child(1) > input.frm_field_lkp";
+            var sel22 = "#FormMain > table > tbody > tr:nth-child(1) > td:nth-child(4) > table > tbody > tr > td:nth-child(1) > input.frm_field_lkp";
+            var selFrase = "#FormMain > table > tbody > tr:nth-child(2) > td:nth-child(4) > table > tbody > tr > td:nth-child(1) > input.frm_field_lkp";
+            var selQtd = "#FormMain > table > tbody > tr:nth-child(3) > td:nth-child(2) > input";
+            var selBtnSalvar = "body > table > tbody > tr:nth-child(1) > td > div > table > tbody > tr:nth-child(2) > td > table > tbody > tr > td:nth-child(2) > table > tbody > tr > td > table > tbody > tr > td > table > tbody > tr:nth-child(1) > td > div > div.act_box > div > div > div > div:nth-child(2) > a";
+            var selBtnFinalizar = "body > table > tbody > tr:nth-child(1) > td > div > table > tbody > tr:nth-child(2) > td > table > tbody > tr > td:nth-child(2) > table > tbody > tr > td > table > tbody > tr > td > table > tbody > tr:nth-child(1) > td > div > div.act_box > div > div > div > div:nth-child(3) > a";
+            var selErro = "#tsk_toolbar";
+            var idx = 0;
+
+            function proximoPasso() {
+                if (!ctx.ativo()) return;
+                if (idx >= lista.length) {
+                    ctx.status("✅ TUDO FINALIZADO!");
+                    ctx.fim();
+                    return;
+                }
+                try {
+                    var doc = ctx.doc();
+                    var inp = doc.querySelector(selCod);
+                    var erro = doc.querySelector(selErro);
+                    var ehUltimo = (idx === lista.length - 1);
+
+                    if (erro && erro.innerText.includes("Verifique")) {
+                        ctx.status("⚠️ Corrigindo erro no " + lista[idx]);
+                        var f = doc.querySelector(selFrase);
+                        if (f) {
+                            f.value = "Exame";
+                            f.dispatchEvent(new Event('input', { bubbles: true }));
+                            f.dispatchEvent(new Event('change', { bubbles: true }));
+                            erro.innerText = "AGUARDANDO SISTEMA...";
+                            setTimeout(function () {
+                                if (!ctx.ativo()) return;
+                                var d2 = ctx.doc();
+                                var btn = ehUltimo ? d2.querySelector(selBtnFinalizar) : d2.querySelector(selBtnSalvar);
+                                if (btn) btn.click();
+                                var checarVazio = setInterval(function () {
+                                    if (!ctx.ativo()) { clearInterval(checarVazio); return; }
+                                    try {
+                                        var docAtual = ctx.doc();
+                                        var inpAtual = docAtual.querySelector(selCod);
+                                        if (ehUltimo || (inpAtual && inpAtual.value === "")) {
+                                            clearInterval(checarVazio);
+                                            idx++;
+                                            setTimeout(proximoPasso, 300);
+                                        }
+                                    } catch (e) { }
+                                }, 250);
+                                ctx.timer(checarVazio);
+                            }, 500);
+                        }
+                        return;
+                    }
+
+                    var codAtual = lista[idx];
+                    var qtdAtual = counts[codAtual];
+
+                    if (!inp || inp.value !== "") {
+                        setTimeout(proximoPasso, 500);
+                        return;
+                    }
+
+                    ctx.status("🚀 Lançando: " + codAtual + " (" + qtdAtual + "x) — " + (idx + 1) + "/" + lista.length);
+                    inp.value = codAtual;
+                    inp.dispatchEvent(new Event('input', { bubbles: true }));
+                    inp.dispatchEvent(new Event('change', { bubbles: true }));
+
+                    var f22 = doc.querySelector(sel22);
+                    if (f22) {
+                        f22.value = "22";
+                        f22.dispatchEvent(new Event('input', { bubbles: true }));
+                        f22.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+
+                    var fFrase = doc.querySelector(selFrase);
+                    if (fFrase) {
+                        fFrase.value = "Exames-Patologia Clínica";
+                        fFrase.dispatchEvent(new Event('input', { bubbles: true }));
+                        fFrase.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+
+                    var inpQtd = doc.querySelector(selQtd);
+                    if (inpQtd) {
+                        inpQtd.value = qtdAtual;
+                        inpQtd.dispatchEvent(new Event('input', { bubbles: true }));
+                        inpQtd.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+
+                    setTimeout(function () {
+                        if (!ctx.ativo()) return;
+                        var d2 = ctx.doc();
+                        var btn = ehUltimo ? d2.querySelector(selBtnFinalizar) : d2.querySelector(selBtnSalvar);
+                        if (btn) btn.click();
+                        var checarVazio = setInterval(function () {
+                            if (!ctx.ativo()) { clearInterval(checarVazio); return; }
+                            try {
+                                var docAtual = ctx.doc();
+                                var erroAtual = docAtual.querySelector(selErro);
+                                if (erroAtual && erroAtual.innerText.includes("Verifique")) {
+                                    clearInterval(checarVazio);
+                                    setTimeout(proximoPasso, 300);
+                                    return;
+                                }
+                                var inpAtual = docAtual.querySelector(selCod);
+                                if (ehUltimo || (inpAtual && inpAtual.value === "")) {
+                                    clearInterval(checarVazio);
+                                    idx++;
+                                    setTimeout(proximoPasso, 300);
+                                }
+                            } catch (erroInterno) { }
+                        }, 250);
+                        ctx.timer(checarVazio);
+                    }, 500);
+                } catch (e) {
+                    setTimeout(proximoPasso, 1000);
+                }
+            }
+            setTimeout(proximoPasso, 1000);
+        },
+
+        "TST": (texto, ctx) => {
+            var raw = texto.match(/\b\d{8}\b/g);
+            if (!raw) { alert("Sem códigos!"); ctx.fim(); return; }
+            var counts = {};
+            raw.forEach(x => counts[x] = (counts[x] || 0) + 1);
+            var unicos = [...new Set(raw)];
+            var order = unicos.filter(c => counts[c] === 1).concat(unicos.filter(c => counts[c] > 1));
+            var lst = order.map(k => ({ cod: k, qtd: counts[k] }));
+            var idx = 0;
+
+            const pausa = ms => new Promise(r => setTimeout(r, ms));
+
+            async function esperarEl(sel, limite) {
+                var t = 0;
+                limite = limite || 5000;
+                while (t < limite) {
+                    if (!ctx.ativo()) throw new Error("Parado");
+                    var el = ctx.doc().querySelector(sel);
+                    if (el && el.offsetParent !== null) return el;
+                    await pausa(200);
+                    t += 200;
+                }
+                throw new Error("Timeout: " + sel);
+            }
+
+            (async function loop() {
+                while (idx < lst.length) {
+                    if (!ctx.ativo()) return;
+                    var item = lst[idx], c = item.cod, q = item.qtd;
+                    ctx.status("Item " + (idx + 1) + "/" + lst.length + ": " + c + (q > 1 ? " (Qtd: " + q + ")" : ""));
+                    try {
+                        await esperarEl("input[value='Adicionar Procedimento']", 10000);
+                        await pausa(500);
+                        var d = ctx.doc();
+                        var w = ctx.win();
+                        var b1 = d.querySelector("input[value='Adicionar Procedimento']") || d.querySelector("input[name='adicionarProcedimento']");
+                        b1.click();
+                        var fixo = await esperarEl("#noreset_txCodTabela");
+                        await pausa(500);
+                        fixo.value = "16";
+                        fixo.dispatchEvent(new w.Event('change', { bubbles: true }));
+                        fixo.dispatchEvent(new w.Event('blur', { bubbles: true }));
+                        try { w.$(fixo).trigger('change'); } catch (e) { }
+                        var inp = await esperarEl("#codItemProcedimento");
+                        await pausa(300);
+                        inp.value = c;
+                        inp.dispatchEvent(new w.Event('change', { bubbles: true }));
+                        inp.dispatchEvent(new w.Event('blur', { bubbles: true }));
+                        var qtd = ctx.doc().getElementById("procedimento.numQtdSolicitada");
+                        if (qtd) {
+                            qtd.value = q;
+                            qtd.dispatchEvent(new w.Event('input', { bubbles: true }));
+                            qtd.dispatchEvent(new w.Event('change', { bubbles: true }));
+                        }
+                        await pausa(500);
+                        var b2 = await esperarEl(".ui-dialog-buttonpane button:nth-child(2)");
+                        if (!b2.innerText.includes("Salvar") && !b2.innerText.includes("Confirmar")) {
+                            var bs = ctx.doc().querySelectorAll("button");
+                            for (var bb of bs) if (bb.innerText.includes("Salvar")) b2 = bb;
+                        }
+                        b2.click();
+                        ctx.status("Salvo! Aguardando...");
+                        idx++;
+                        await pausa(1500);
+                    } catch (e) {
+                        ctx.status("ERRO: " + e.message);
+                        if (e.message !== "Parado") alert("Erro: " + e.message);
+                        return;
+                    }
+                }
+                ctx.status("✅ FIM!");
+                ctx.fim();
+            })();
+        },
+
+        "PLANASSISTE MPU": (texto, ctx) => {
+            var v = texto.match(/\b\d{8}\b/g);
+            if (!v) { alert('Nenhum código válido.'); ctx.fim(); return; }
+            var cts = {};
+            for (var i = 0; i < v.length; i++) { cts[v[i]] = (cts[v[i]] || 0) + 1; }
+            var q = [];
+            for (var k in cts) { q.push({ c: k, qty: cts[k] }); }
+            var id = 0, st = 'tabela';
+            ctx.status('Processando ' + q.length + ' códigos únicos...');
+
+            var lp = setInterval(function () {
+                if (!ctx.ativo()) { clearInterval(lp); return; }
+                var d, cw;
+                try { cw = ctx.win(); d = cw.document; } catch (e) { return; }
+                if (d.readyState !== 'complete') return;
+
+                if (id >= q.length) {
+                    clearInterval(lp);
+                    ctx.status('✅ Concluído! O último código foi salvo e a tela finalizada.');
+                    ctx.fim();
+                    return;
+                }
+
+                if (st === 'tabela') {
+                    var b = d.querySelector('#CODIGOTABELA_btn');
+                    if (b) {
+                        if (!cw._hk) {
+                            var o = cw.open;
+                            cw.open = function (a, x, c) {
+                                var w = o.call(cw, a, x, c);
+                                var t = setInterval(function () {
+                                    try {
+                                        var l = null;
+                                        var es = w.document.querySelectorAll('a');
+                                        for (var i = 0; i < es.length; i++) {
+                                            var txt = (es[i].innerText || '').toUpperCase();
+                                            if (txt.includes('22 - PROCEDIMENTO') || txt === '22' || txt === '16' || txt.includes('PROCEDIMENTO')) {
+                                                l = es[i];
+                                                break;
+                                            }
+                                        }
+                                        if (!l) {
+                                            l = w.document.querySelector('#FormMain > div > div > div > div > div > div > div > div > div.div_grid > table > tbody > tr:nth-child(6) > td:nth-child(1) > a');
+                                        }
+                                        if (!l) {
+                                            for (var i = 0; i < es.length; i++) {
+                                                if ((es[i].innerText || '').includes('TUSS')) { l = es[i]; break; }
+                                            }
+                                        }
+                                        if (l) { l.click(); clearInterval(t); st = 'preencher'; }
+                                    } catch (e) { }
+                                }, 500);
+                                ctx.timer(t);
+                                return w;
+                            };
+                            cw._hk = true;
+                            b.click();
+                            ctx.status('Aguardando a tabela TUSS...');
+                        }
+                    } else {
+                        st = 'preencher';
+                    }
+                } else if (st === 'preencher') {
+                    var f1 = d.querySelector('#FormMain > table > tbody > tr:nth-child(1) > td:nth-child(4) > table > tbody > tr > td:nth-child(1) > input.frm_field_lkp');
+                    var f2 = d.querySelector('#FormMain > table > tbody > tr:nth-child(3) > td:nth-child(2) > table > tbody > tr > td:nth-child(1) > input.frm_field_lkp');
+                    var fq = d.querySelector('#FormMain > table > tbody > tr:nth-child(2) > td:nth-child(2) > input');
+                    var ult = (id === q.length - 1);
+                    var sb = ult
+                        ? 'body > table > tbody > tr:nth-child(1) > td > div > table > tbody > tr:nth-child(2) > td > table > tbody > tr > td.StmMain > table > tbody > tr > td > table > tbody > tr > td > table > tbody > tr:nth-child(1) > td > div > div.act_box > div > div > div > div:nth-child(3) > a'
+                        : 'body > table > tbody > tr:nth-child(1) > td > div > table > tbody > tr:nth-child(2) > td > table > tbody > tr > td.StmMain > table > tbody > tr > td > table > tbody > tr > td > table > tbody > tr:nth-child(1) > td > div > div.act_box > div > div > div > div:nth-child(2) > a > nobr';
+                    var bt = d.querySelector(sb);
+                    if (f1 && f2 && bt) {
+                        if (cw._wt) return;
+                        ctx.status(ult
+                            ? ('⏳ Finalizando com: ' + q[id].c + ' (Qtd: ' + q[id].qty + ') - Último!')
+                            : ('⏳ Inserindo: ' + q[id].c + ' (Qtd: ' + q[id].qty + ') - ' + (id + 1) + '/' + q.length));
+                        f1.value = ''; f1.value = q[id].c;
+                        f1.dispatchEvent(new Event('input', { bubbles: true }));
+                        f1.dispatchEvent(new Event('change', { bubbles: true }));
+                        f2.value = ''; f2.value = 'Exames-Patologia Clínica';
+                        f2.dispatchEvent(new Event('input', { bubbles: true }));
+                        f2.dispatchEvent(new Event('change', { bubbles: true }));
+                        if (fq && q[id].qty > 1) {
+                            fq.value = ''; fq.value = q[id].qty;
+                            fq.dispatchEvent(new Event('input', { bubbles: true }));
+                            fq.dispatchEvent(new Event('change', { bubbles: true }));
+                        }
+                        cw._wt = true;
+                        setTimeout(function () { try { bt.click(); id++; } catch (e) { } }, 800);
+                    } else {
+                        cw._wt = false;
+                    }
+                }
+            }, 1500);
+            ctx.timer(lp);
+        }
+    };
+
     // ── NAVEGAÇÃO ENTRE AS DUAS TELAS ─────────────────────────────
     let roboAtual = null;
     const btnIniciar = document.getElementById('cr-iniciar');
@@ -1986,31 +2392,23 @@
         vigias = [];
     };
 
-    // ── INICIAR: roda o robô sem sair desta janela ────────────────
-    const iniciarAutomacao = (nome, texto) => {
-        rodando = true;
-        elementosRobo = [];
-        janelasRobo = [];
-        modoParar();
-        mostrarStatus('▶ Iniciando automação...', '#4dc3ff');
-
+    // ── CAMINHO PADRÃO: robôs que já rodam na própria página ──────
+    const iniciarPadrao = (nome, texto) => {
         const antes = new Set(Array.from(document.body.children));
         executarRobo(nome, texto);
 
-        // Vigia os painéis que o robô cria e tira eles da frente
         let ciclos = 0;
         const idStatus = statusRobo[nome];
         const vigia = setInterval(() => {
             if (!rodando) { clearInterval(vigia); return; }
 
             Array.from(document.body.children).forEach(el => {
-                if (el !== menu && !antes.has(el) && elementosRobo.indexOf(el) === -1) {
+                if (el !== menu && el.id !== 'cr-espelho' && !antes.has(el) && elementosRobo.indexOf(el) === -1) {
                     elementosRobo.push(el);
                     esconderElemento(el);
                 }
             });
 
-            // Espelha o progresso do robô aqui dentro
             if (idStatus) {
                 const alvo = document.getElementById(idStatus);
                 if (alvo) {
@@ -2036,10 +2434,75 @@
         vigias.push(vigia);
     };
 
+    // ── CAMINHO ESPELHO: portal embutido, robô pilota daqui ───────
+    const rodarInline = (nome, texto) => {
+        mostrarStatus('⏳ Preparando o portal...', '#4dc3ff');
+        const iframe = abrirEspelho();
+        let tentativas = 0;
+
+        const ctx = {
+            doc: () => espelho.iframe.contentWindow.document,
+            win: () => espelho.iframe.contentWindow,
+            status: t => mostrarStatus(t, '#4dc3ff'),
+            ativo: () => rodando && !!espelho,
+            timer: t => vigias.push(t),
+            fim: () => {
+                rodando = false;
+                limparVigias();
+                modoIniciar();
+                mostrarStatus('✅ Automação concluída! O portal continua aqui na tela.', '#2ecc71');
+            }
+        };
+
+        const espera = setInterval(() => {
+            if (!rodando) { clearInterval(espera); return; }
+            tentativas++;
+            let pronto = false;
+            try {
+                const d = iframe.contentWindow.document;
+                pronto = !!(d && d.body && d.readyState === 'complete' && d.body.innerHTML.length > 200);
+            } catch (e) { pronto = false; }
+
+            if (pronto) {
+                clearInterval(espera);
+                mostrarStatus('▶ Iniciando automação...', '#4dc3ff');
+                try {
+                    roboInline[nome](texto, ctx);
+                } catch (e) {
+                    mostrarStatus('❌ ' + e.message, '#ff6b5e');
+                    ctx.fim();
+                }
+                return;
+            }
+
+            if (tentativas > 50) {
+                // Portal não aceitou ser embutido: volta para o método antigo
+                clearInterval(espera);
+                fecharEspelho();
+                mostrarStatus('⚠️ Este portal não permitiu o modo embutido. Abrindo pelo método antigo...', '#ffd633');
+                iniciarPadrao(nome, texto);
+            }
+        }, 400);
+        vigias.push(espera);
+    };
+
+    // ── INICIAR: roda o robô sem sair desta janela ────────────────
+    const iniciarAutomacao = (nome, texto) => {
+        rodando = true;
+        elementosRobo = [];
+        janelasRobo = [];
+        modoParar();
+        mostrarStatus('▶ Iniciando automação...', '#4dc3ff');
+
+        if (roboInline[nome]) { rodarInline(nome, texto); return; }
+        iniciarPadrao(nome, texto);
+    };
+
     // ── PARAR: desliga o que der e devolve o botão ao normal ──────
     const pararAutomacao = () => {
         const tinhaJanela = janelasRobo.length > 0;
         const tinhaPainel = elementosRobo.length > 0;
+        const tinhaEspelho = !!espelho;
 
         rodando = false;
         limparVigias();
@@ -2052,8 +2515,13 @@
 
         modoIniciar();
 
+        if (tinhaEspelho) {
+            fecharEspelho();
+            mostrarStatus('⏹ Automação interrompida. Se a tela parecer desatualizada, aperte F5.', '#ff6b5e');
+            return;
+        }
+
         if (!tinhaJanela && !tinhaPainel) {
-            // Robô que roda direto na página: só recarregando para de vez
             mostrarStatus('⏹ Para interromper este robô é preciso recarregar a página.', '#ffd633');
             if (confirm('Este convênio roda direto na página do portal.\n\nPara interromper de verdade é preciso recarregar a página (você perderá o que estiver preenchido).\n\nRecarregar agora?')) {
                 location.reload();
