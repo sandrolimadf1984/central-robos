@@ -2561,20 +2561,95 @@
             };
 
             // Cada linha da tabela: o seletor de tabela + código, descrição e quantidade
-            const camposDaLinha = tr => {
-                const ins = Array.from(tr.querySelectorAll('input')).filter(i => {
-                    const t = (i.getAttribute('type') || 'text').toLowerCase();
-                    return (t === 'text' || t === '') && !i.disabled;
-                });
+            const digitaveis = raiz => Array.from(raiz.querySelectorAll('input')).filter(i => {
+                const t = (i.getAttribute('type') || 'text').toLowerCase();
+                return (t === 'text' || t === '') && !i.disabled;
+            });
+
+            // Qual coluna é o quê, descoberto pelos rótulos da própria tela
+            // (25-Código do Procedimento, 26-Descrição, 27-Qt. Solic.)
+            const mapaColunas = () => {
+                try {
+                    const sel = selectsTuss(doc())[0];
+                    const tabela = sel && sel.closest && sel.closest('table');
+                    if (!tabela) return null;
+                    for (const tr of Array.from(tabela.rows || [])) {
+                        const cels = Array.from(tr.cells || []);
+                        const txt = cels.map(c => (c.textContent || '').replace(/\s+/g, ' ').trim());
+                        const onde = pref => txt.findIndex(t => t.indexOf(pref) === 0);
+                        const iCod = onde('25-'), iDesc = onde('26-'), iQtd = onde('27-');
+                        if (iCod >= 0 && iQtd >= 0) return { cod: iCod, desc: iDesc, qtd: iQtd };
+                    }
+                } catch (e) { }
+                return null;
+            };
+
+            // Reserva: casa cada campo com a coluna pela posição na tela
+            const camposPorPosicao = tr => {
+                try {
+                    const centro = pref => {
+                        const cand = Array.from(doc().querySelectorAll('td,th,div,span,b,font,p'))
+                            .filter(e => (e.textContent || '').replace(/\s+/g, ' ').trim().indexOf(pref) === 0)
+                            .sort((a, b) => (a.textContent || '').length - (b.textContent || '').length);
+                        for (const e of cand) {
+                            const r = e.getBoundingClientRect();
+                            if (r && r.width > 0) return r.left + r.width / 2;
+                        }
+                        return null;
+                    };
+                    const xCod = centro('25-'), xDesc = centro('26-'), xQtd = centro('27-');
+                    if (xCod === null || xQtd === null) return null;
+                    const ins = digitaveis(tr).filter(i => {
+                        const r = i.getBoundingClientRect();
+                        return r && r.width > 0;
+                    });
+                    if (ins.length < 2) return null;
+                    const perto = alvo => {
+                        let melhor = null, dist = Infinity;
+                        ins.forEach(i => {
+                            const r = i.getBoundingClientRect();
+                            const d = Math.abs((r.left + r.width / 2) - alvo);
+                            if (d < dist) { dist = d; melhor = i; }
+                        });
+                        return melhor;
+                    };
+                    const cod = perto(xCod), qtd = perto(xQtd);
+                    if (!cod || !qtd || cod === qtd) return null;
+                    let desc = xDesc === null ? null : perto(xDesc);
+                    if (desc === cod || desc === qtd) desc = null;
+                    return { cod, desc, qtd };
+                } catch (e) { return null; }
+            };
+
+            const camposDaLinha = (tr, mapa) => {
+                const doCel = cel => cel ? cel.querySelector(
+                    'input:not([type=hidden]):not([type=button]):not([type=submit]):not([type=image]):not([type=checkbox]):not([type=radio])') : null;
+
+                // 1º) pelas colunas dos rótulos
+                if (mapa && tr.cells && tr.cells.length > Math.max(mapa.cod, mapa.qtd)) {
+                    const cod = doCel(tr.cells[mapa.cod]);
+                    const qtd = doCel(tr.cells[mapa.qtd]);
+                    const desc = (mapa.desc >= 0) ? doCel(tr.cells[mapa.desc]) : null;
+                    if (cod && qtd && cod !== qtd) return { cod, desc, qtd };
+                }
+                // 2º) pela posição na tela
+                const porTela = camposPorPosicao(tr);
+                if (porTela) return porTela;
+                // 3º) último recurso: ordem no código
+                const ins = digitaveis(tr);
                 return { cod: ins[0], desc: ins[1], qtd: ins[2] };
             };
 
-            const linhas = () => selectsTuss(doc()).map(sel => {
-                const tr = sel.closest('tr') || (sel.parentElement && sel.parentElement.parentElement);
-                if (!tr) return null;
-                const c = camposDaLinha(tr);
-                return c.cod ? { sel, tr, cod: c.cod, desc: c.desc, qtd: c.qtd } : null;
-            }).filter(Boolean);
+            const linhas = () => {
+                const mapa = mapaColunas();
+                return selectsTuss(doc()).map(sel => {
+                    const tr = sel.closest('tr') || (sel.parentElement && sel.parentElement.parentElement);
+                    if (!tr) return null;
+                    const c = camposDaLinha(tr, mapa);
+                    if (!c.cod || !c.qtd || c.cod === c.qtd) return null;
+                    return { sel, tr, cod: c.cod, desc: c.desc, qtd: c.qtd };
+                }).filter(Boolean);
+            };
 
             const botaoAdicionar = () => {
                 try {
@@ -2691,8 +2766,8 @@
                     }
                     if (!nomeVeio) ctx.status(`⚠️ ${item.cod}: o nome do exame não voltou — seguindo em frente`);
 
-                    // 5) Quantidade solicitada
-                    if (linha.qtd) {
+                    // 5) Quantidade solicitada (nunca no campo da descrição)
+                    if (linha.qtd && linha.qtd !== linha.desc && linha.qtd !== linha.cod) {
                         try { linha.qtd.focus(); } catch (e) { }
                         linha.qtd.value = item.qtd;
                         disparar(linha.qtd, 'input');
