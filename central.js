@@ -339,6 +339,115 @@
         })
         .catch(erro => console.log("Sem avisos no momento."));
 
+    // ═══════════════════════════════════════════════════════════════
+    //  CNU UNIMED — a tela de autorização abre numa janela separada
+    //  sem barra de favoritos, então o app não pode ser aberto nela.
+    //  Solução: o app fica nesta aba e pilota aquela janela de fora.
+    // ═══════════════════════════════════════════════════════════════
+    let janelaUnimed = null;
+    const MARCA_SADT = /SolicitacaoDeSPSADT/i;
+
+    // Fica de olho em toda janela que o portal abrir, para poder achá-la depois
+    (() => {
+        try {
+            window.__crJanelas = window.__crJanelas || [];
+            if (window.__crHookOpen) return;
+            const abrirOriginal = window.open;
+            window.open = function () {
+                const w = abrirOriginal.apply(window, arguments);
+                try { if (w) window.__crJanelas.push(w); } catch (e) { }
+                return w;
+            };
+            window.__crHookOpen = true;
+        } catch (e) { }
+    })();
+
+    // Reconhece a tela de autorização pelos campos dela (linha com tabela TUSS)
+    const selectsTuss = d => {
+        try {
+            return Array.from(d.querySelectorAll('select')).filter(sel =>
+                Array.from(sel.options || []).some(o => /procedimentos?\s+e\s+eventos/i.test(o.textContent || '')));
+        } catch (e) { return []; }
+    };
+
+    // Campos que o portal exige preenchidos ANTES de aceitar os códigos.
+    // Achados pelo número do rótulo da própria tela (8-, 10-, 15-, ...).
+    const CAMPOS_GUIA = [
+        { rot: '8-',  nome: '8-Número da Carteira' },
+        { rot: '9-',  nome: '9-Validade da Carteira' },
+        { rot: '10-', nome: '10-Nome do Beneficiário' },
+        { rot: '13-', nome: '13-Código na Operadora' },
+        { rot: '14-', nome: '14-Nome do Contratado' },
+        { rot: '15-', nome: '15-Nome do Profissional Solicitante' },
+        { rot: '16-', nome: '16-Conselho Profissional' },
+        { rot: '17-', nome: '17-Número no Conselho' },
+        { rot: '18-', nome: '18-UF' },
+        { rot: '19-', nome: '19-Código CBO-s' },
+        { rot: '21-', nome: '21-Caráter do Atendimento' },
+        { rot: '22-', nome: '22-Data da Solicitação' },
+        { rot: '23-', nome: '23-Indicação Clínica' },
+        { rot: '29-', nome: '29-Cód. na Operadora (executante)' },
+        { rot: '30-', nome: '30-Nome do Contratado (executante)' }
+    ];
+
+    // Localiza o campo pelo rótulo numerado que aparece na tela
+    const acharCampoPorRotulo = (d, rotulo) => {
+        try {
+            const cand = Array.from(d.querySelectorAll('td,div,span,label,th,p,b,font,legend'));
+            let melhor = null, menorTam = Infinity;
+            for (const el of cand) {
+                const t = (el.textContent || '').replace(/\s+/g, ' ').trim();
+                if (!t.startsWith(rotulo)) continue;
+                if (t.length > rotulo.length + 70) continue;      // texto grande = contêiner errado
+                if (t.length < menorTam) { menorTam = t.length; melhor = el; }
+            }
+            if (!melhor) return null;
+            const pegar = raiz => {
+                if (!raiz || !raiz.querySelector) return null;
+                return raiz.querySelector('input:not([type=hidden]):not([type=button]):not([type=submit]):not([type=radio]):not([type=checkbox]),select,textarea');
+            };
+            let campo = pegar(melhor), sobe = melhor;
+            for (let i = 0; i < 3 && !campo && sobe; i++) { sobe = sobe.parentElement; campo = pegar(sobe); }
+            return campo;
+        } catch (e) { return null; }
+    };
+
+    const campoVazio = el => {
+        if (!el) return false;                    // não achou: não acusa
+        const v = (el.value || '').trim();
+        if (!v) return true;
+        if (el.tagName === 'SELECT') {
+            const txt = ((el.options[el.selectedIndex] || {}).textContent || '').trim().toLowerCase();
+            if (!txt || txt === 'escolha' || txt === 'selecione' || txt === '--') return true;
+        }
+        return false;
+    };
+
+    const conferirCabecalho = d => {
+        const faltando = [];
+        CAMPOS_GUIA.forEach(c => {
+            const el = acharCampoPorRotulo(d, c.rot);
+            if (campoVazio(el)) faltando.push(c.nome);
+        });
+        return faltando;
+    };
+
+    let unimedForcar = false;
+
+    const acharJanelaSADT = () => {
+        try { if (MARCA_SADT.test(location.href) && selectsTuss(document).length) return window; } catch (e) { }
+        const lista = (window.__crJanelas || []).slice().reverse();
+        for (const w of lista) {
+            try {
+                if (!w || w.closed || !w.document) continue;
+                if (MARCA_SADT.test(w.location.href)) return w;
+                if (selectsTuss(w.document).length) return w;
+            } catch (e) { }
+        }
+        try { if (selectsTuss(document).length) return window; } catch (e) { }
+        return null;
+    };
+
     const robos = {
         "PLANASSISTE MPU": () => {
             (function(){
@@ -1830,6 +1939,7 @@
     };
     // ── FICHA DE CADA CONVÊNIO (ícone, cor, descrição, modo de entrega) ──
     const infoRobos = {
+        "CNU UNIMED":       { icone: "🧬", cor: "#00995d", desc: "Automação para Autorizações CNU Unimed",     modo: "janela" },
         "AFFEGO":           { icone: "🛠️", cor: "#378ADD", desc: "Automação para Fisco e Convênios Affego",        modo: "prompt" },
         "AMIL":             { icone: "🩺", cor: "#2ecc71", desc: "Automação para Rede Credenciada Amil",           modo: "painel", txt: "tc",            btn: "bi" },
         "INAS":             { icone: "🤝", cor: "#d9a520", desc: "Automação para Convênios Inas GDF",              modo: "painel", txt: "g-codes",       btn: "g-start" },
@@ -2357,6 +2467,186 @@
         }
     };
 
+    // ── ROBÔ QUE PILOTA UMA JANELA SEPARADA (CNU Unimed) ──────────
+    const roboJanela = {
+
+        "CNU UNIMED": (texto, ctx) => {
+            const LIMITE = 30;
+
+            // Códigos repetidos não viram linhas novas: viram quantidade
+            const brutos = texto.match(/\b\d{8}\b/g) || [];
+            if (!brutos.length) {
+                ctx.status('❌ Nenhum código de 8 dígitos encontrado no texto colado.');
+                ctx.fim();
+                return;
+            }
+            const contagem = {};
+            brutos.forEach(c => contagem[c] = (contagem[c] || 0) + 1);
+            let unicos = Object.keys(contagem);
+            let aviso = '';
+            if (unicos.length > LIMITE) {
+                aviso = ' ⚠️ o Unimed aceita no máximo 30 — os demais ficaram de fora';
+                unicos = unicos.slice(0, LIMITE);
+            }
+            const itens = unicos.map(c => ({ cod: c, qtd: contagem[c] }));
+
+            const espera = ms => new Promise(r => setTimeout(r, ms));
+            const doc = () => ctx.doc();
+
+            const disparar = (el, tipo) => {
+                try { el.dispatchEvent(new (ctx.win().Event || Event)(tipo, { bubbles: true })); }
+                catch (e) { try { el.dispatchEvent(new Event(tipo, { bubbles: true })); } catch (e2) { } }
+            };
+
+            // Cada linha da tabela: o seletor de tabela + código, descrição e quantidade
+            const camposDaLinha = tr => {
+                const ins = Array.from(tr.querySelectorAll('input')).filter(i => {
+                    const t = (i.getAttribute('type') || 'text').toLowerCase();
+                    return (t === 'text' || t === '') && !i.disabled;
+                });
+                return { cod: ins[0], desc: ins[1], qtd: ins[2] };
+            };
+
+            const linhas = () => selectsTuss(doc()).map(sel => {
+                const tr = sel.closest('tr') || (sel.parentElement && sel.parentElement.parentElement);
+                if (!tr) return null;
+                const c = camposDaLinha(tr);
+                return c.cod ? { sel, tr, cod: c.cod, desc: c.desc, qtd: c.qtd } : null;
+            }).filter(Boolean);
+
+            const botaoAdicionar = () => {
+                try {
+                    const alvos = Array.from(doc().querySelectorAll('input[type=button],input[type=submit],button,a'));
+                    return alvos.find(b => {
+                        const t = ((b.value || '') + ' ' + (b.textContent || '')).trim().toLowerCase();
+                        return t === 'adicionar' || /(^|\s)adicionar(\s|$)/.test(t);
+                    });
+                } catch (e) { return null; }
+            };
+
+            const esperarPagina = async () => {
+                for (let i = 0; i < 60; i++) {
+                    if (!ctx.ativo()) return false;
+                    try { if (doc().readyState === 'complete') return true; } catch (e) { }
+                    await espera(300);
+                }
+                return false;
+            };
+
+            (async () => {
+                if (!await esperarPagina()) {
+                    ctx.status('❌ Perdi a janela de autorização.');
+                    ctx.fim();
+                    return;
+                }
+                if (!linhas().length) {
+                    ctx.status('❌ Não achei a tabela de procedimentos nessa janela.\nConfira se ela está na tela de autorização (SP/SADT).');
+                    ctx.fim();
+                    return;
+                }
+
+                // O portal recusa os códigos se o cabeçalho da guia estiver incompleto.
+                // Conferimos antes, para não sujar a guia nem tomar erro do sistema.
+                if (!unimedForcar) {
+                    const faltando = conferirCabecalho(doc());
+                    if (faltando.length) {
+                        unimedForcar = true;   // se insistir, na próxima eu sigo mesmo assim
+                        ctx.status('⚠️ Antes de lançar os códigos, preencha na janela:\n• ' +
+                            faltando.join('\n• ') +
+                            '\n\nDepois clique em INICIAR de novo.\n(Se já estiver tudo preenchido, clique em INICIAR que eu sigo mesmo assim.)');
+                        ctx.fim();
+                        return;
+                    }
+                }
+
+                for (let i = 0; i < itens.length; i++) {
+                    if (!ctx.ativo()) return;
+                    const item = itens[i];
+                    ctx.status(`⏳ ${i + 1}/${itens.length} — código ${item.cod}` +
+                        (item.qtd > 1 ? ` (quantidade ${item.qtd})` : '') + aviso);
+
+                    // 1) Garante uma linha vazia; se acabaram, clica em "Adicionar"
+                    let linha = null;
+                    let pediuMais = false;
+                    for (let t = 0; t < 50; t++) {
+                        if (!ctx.ativo()) return;
+                        await esperarPagina();
+                        const todas = linhas();
+                        linha = todas.find(l => !(l.cod.value || '').trim());
+                        if (linha) break;
+                        if (!pediuMais) {
+                            const add = botaoAdicionar();
+                            if (!add) {
+                                ctx.status('❌ Não encontrei o botão "Adicionar" na janela.');
+                                ctx.fim();
+                                return;
+                            }
+                            ctx.status(`➕ Abrindo mais linhas... (${i + 1}/${itens.length})`);
+                            add.click();
+                            pediuMais = true;
+                        }
+                        await espera(400);
+                    }
+                    if (!linha) {
+                        ctx.status(`❌ Parei no ${item.cod}: não apareceu linha vazia.`);
+                        ctx.fim();
+                        return;
+                    }
+
+                    // 2) Escolhe "TUSS -- Procedimentos e eventos em saúde"
+                    const opcao = Array.from(linha.sel.options)
+                        .find(o => /procedimentos?\s+e\s+eventos/i.test(o.textContent || ''));
+                    if (opcao) {
+                        linha.sel.focus();
+                        linha.sel.value = opcao.value;
+                        disparar(linha.sel, 'input');
+                        disparar(linha.sel, 'change');
+                        try { if (typeof linha.sel.onchange === 'function') linha.sel.onchange(); } catch (e) { }
+                        await espera(300);
+                    }
+
+                    // 3) Digita o código do procedimento
+                    try { linha.cod.focus(); } catch (e) { }
+                    linha.cod.value = item.cod;
+                    disparar(linha.cod, 'input');
+                    disparar(linha.cod, 'change');
+                    try { linha.cod.blur(); } catch (e) { }
+                    disparar(linha.cod, 'blur');
+                    disparar(linha.cod, 'focusout');
+
+                    // 4) Espera o portal trazer o nome do exame
+                    let nomeVeio = false;
+                    for (let t = 0; t < 48; t++) {
+                        if (!ctx.ativo()) return;
+                        try {
+                            const atual = linhas().find(l => (l.cod.value || '').trim() === item.cod);
+                            if (atual) {
+                                linha = atual;
+                                if (atual.desc && (atual.desc.value || '').trim().length > 1) { nomeVeio = true; break; }
+                            }
+                        } catch (e) { }
+                        await espera(250);
+                    }
+                    if (!nomeVeio) ctx.status(`⚠️ ${item.cod}: o nome do exame não voltou — seguindo em frente`);
+
+                    // 5) Quantidade solicitada
+                    if (linha.qtd) {
+                        try { linha.qtd.focus(); } catch (e) { }
+                        linha.qtd.value = item.qtd;
+                        disparar(linha.qtd, 'input');
+                        disparar(linha.qtd, 'change');
+                        try { linha.qtd.blur(); } catch (e) { }
+                        disparar(linha.qtd, 'blur');
+                    }
+                    await espera(300);
+                }
+
+                ctx.status(`✅ Concluído! ${itens.length} exame(s) lançado(s).${aviso}\nConfira na janela e finalize a autorização.`);
+                ctx.fim();
+            })();
+        }
+    };
+
     // ── NAVEGAÇÃO ENTRE AS DUAS TELAS ─────────────────────────────
     let roboAtual = null;
     const btnIniciar = document.getElementById('cr-iniciar');
@@ -2744,6 +3034,54 @@
         vigias.push(espera);
     };
 
+    // ── CAMINHO JANELA: acha a tela de autorização e pilota de fora ─
+    const rodarJanela = (nome, texto) => {
+        mostrarStatus('🔍 Procurando a janela de autorização...', '#4dc3ff');
+        let tentativas = 0;
+        const procurar = setInterval(() => {
+            if (!rodando) { clearInterval(procurar); return; }
+            const alvo = acharJanelaSADT();
+
+            if (alvo) {
+                clearInterval(procurar);
+                janelaUnimed = alvo;
+                const ctx = {
+                    doc: () => janelaUnimed.document,
+                    win: () => janelaUnimed,
+                    status: t => mostrarStatus(t, '#4dc3ff'),
+                    ativo: () => rodando && janelaUnimed && !janelaUnimed.closed,
+                    timer: t => vigias.push(t),
+                    fim: () => {
+                        rodando = false;
+                        limparVigias();
+                        encerrarModoAutomacao();
+                        modoIniciar();
+                    }
+                };
+                mostrarStatus('✅ Janela encontrada! Começando...', '#2ecc71');
+                try { roboJanela[nome](texto, ctx); }
+                catch (e) { mostrarStatus('❌ ' + e.message, '#ff6b5e'); ctx.fim(); }
+                return;
+            }
+
+            tentativas++;
+            if (tentativas === 3 || tentativas % 12 === 0) {
+                mostrarStatus('🔍 Aguardando a tela de autorização...\n' +
+                    'Abra ela pelo portal agora. Se já estiver aberta, feche e abra de novo — ' +
+                    'assim eu consigo enxergá-la.', '#ffd633');
+            }
+            if (tentativas > 240) {   // ~2 minutos
+                clearInterval(procurar);
+                rodando = false;
+                encerrarModoAutomacao();
+                modoIniciar();
+                mostrarStatus('❌ Não encontrei a janela de autorização.\n' +
+                    'Abra a tela SP/SADT pelo portal e clique em INICIAR novamente.', '#ff6b5e');
+            }
+        }, 500);
+        vigias.push(procurar);
+    };
+
     // ── INICIAR: roda o robô sem sair desta janela ────────────────
     const iniciarAutomacao = (nome, texto) => {
         rodando = true;
@@ -2754,6 +3092,7 @@
         try { silenciarAvisos(); } catch (e) { console.log('aviso:', e.message); }
         mostrarStatus('▶ Iniciando... pode minimizar ou trocar de aba.\n⚙️ ' + motor.diag.join(' · '), '#4dc3ff');
 
+        if (roboJanela[nome]) { rodarJanela(nome, texto); return; }
         if (roboInline[nome]) { rodarInline(nome, texto); return; }
         iniciarPadrao(nome, texto);
     };
@@ -2775,6 +3114,12 @@
         try { window._b403 = 0; } catch (e) { }
 
         modoIniciar();
+
+        // A janela de autorização é do usuário: nunca fechar nem recarregar
+        if (roboJanela[roboAtual]) {
+            mostrarStatus('⏹ Automação interrompida. A janela de autorização continua aberta.', '#ff6b5e');
+            return;
+        }
 
         if (tinhaEspelho) {
             fecharEspelho();
@@ -2805,6 +3150,7 @@
         ic.style.background = 'linear-gradient(135deg,' + item.cor + 'cc,' + item.cor + '66)';
         ic.style.boxShadow = '0 0 12px ' + item.cor + '80';
         campoCodigos.value = '';
+        unimedForcar = false;
         statusExec.style.display = 'none';
         const infoMotor = document.getElementById('cr-motor-info');
         if (infoMotor) infoMotor.innerText = '';
@@ -2837,6 +3183,7 @@
     const EXIBICAO = [
         { rotulo: "Affego",            chave: "AFFEGO",           icone: "🛠️", cor: "#378ADD", desc: "Automação para Fisco e Convênios Affego" },
         { rotulo: "Amil",              chave: "AMIL",             icone: "🩺", cor: "#2ecc71", desc: "Automação para Rede Credenciada Amil" },
+        { rotulo: "CNU Unimed",        chave: "CNU UNIMED",       icone: "🧬", cor: "#00995d", desc: "Automação para Autorizações CNU Unimed" },
         { rotulo: "Inas GDF",          chave: "INAS",             icone: "🤝", cor: "#d9a520", desc: "Automação para Convênios Inas GDF" },
         { rotulo: "Medsenior",         chave: "MEDSENIOR/UN SEG", icone: "🏥", cor: "#27ae60", desc: "Automação para Convênio Medsenior" },
         { rotulo: "Planassiste MPU",   chave: "PLANASSISTE MPU",  icone: "📝", cor: "#2d7dff", desc: "Automação para Planilhas do MPU" },
