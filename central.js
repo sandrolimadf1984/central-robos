@@ -434,7 +434,67 @@
 
     let unimedForcar = false;
 
+    const URL_SADT = 'https://saw.trixti.com.br/saw/tiss/SolicitacaoDeSPSADT40.do?method=abrirTelaDeSolicitacaoDeSPSADT';
+    let unimedTentouAbrir = false;
+
+    // A janela pode ter sido aberta por um link com target="nome" — nesse caso
+    // o window.open não foi chamado e não capturamos nada. Mas se descobrirmos
+    // o NOME dela, conseguimos pegá-la de volta.
+    const nomesDeJanela = () => {
+        const achados = [];
+        const guardar = n => {
+            n = (n || '').trim();
+            if (!n || /^_(blank|self|top|parent)$/i.test(n)) return;
+            if (achados.indexOf(n) === -1) achados.push(n);
+        };
+        try {
+            Array.from(document.querySelectorAll('[target]')).forEach(el => guardar(el.getAttribute('target')));
+            const fontes = [];
+            Array.from(document.querySelectorAll('script')).forEach(sc => { if (!sc.src) fontes.push(sc.textContent || ''); });
+            Array.from(document.querySelectorAll('[onclick],[onchange],[href]')).forEach(el => {
+                fontes.push(el.getAttribute('onclick') || '');
+                fontes.push(el.getAttribute('onchange') || '');
+                const h = el.getAttribute('href') || '';
+                if (h.indexOf('javascript:') === 0) fontes.push(h);
+            });
+            const texto = fontes.join('\n');
+            let m;
+            const reOpen = /open\s*\(\s*[^,()]*,\s*['"]([^'"]+)['"]/g;
+            while ((m = reOpen.exec(texto))) guardar(m[1]);
+            const reTarget = /\.target\s*=\s*['"]([^'"]+)['"]/g;
+            while ((m = reTarget.exec(texto))) guardar(m[1]);
+        } catch (e) { }
+        ['SADT', 'sadt', 'popup', 'Popup', 'janela', 'Janela', 'win', 'novaJanela',
+         'solicitacao', 'Solicitacao', 'guia', 'Guia', 'principal'].forEach(guardar);
+        return achados;
+    };
+
+    const serveComoSADT = w => {
+        try {
+            if (!w || w.closed || !w.document) return false;
+            if (MARCA_SADT.test(w.location.href)) return true;
+            return selectsTuss(w.document).length > 0;
+        } catch (e) { return false; }
+    };
+
+    const tentarPorNome = () => {
+        for (const n of nomesDeJanela()) {
+            let w = null;
+            try { w = window.open('', n); } catch (e) { continue; }
+            if (!w || w === window) continue;
+            if (serveComoSADT(w)) return w;
+            // não era ela: se foi uma janela em branco que acabei de criar, fecho
+            try {
+                const vazia = (w.location.href === 'about:blank') &&
+                    (!w.document || !w.document.body || !(w.document.body.innerHTML || '').trim());
+                if (vazia) w.close();
+            } catch (e) { }
+        }
+        return null;
+    };
+
     const acharJanelaSADT = () => {
+        if (serveComoSADT(janelaUnimed)) return janelaUnimed;
         try { if (MARCA_SADT.test(location.href) && selectsTuss(document).length) return window; } catch (e) { }
         const lista = (window.__crJanelas || []).slice().reverse();
         for (const w of lista) {
@@ -445,6 +505,8 @@
             } catch (e) { }
         }
         try { if (selectsTuss(document).length) return window; } catch (e) { }
+        const porNome = tentarPorNome();
+        if (porNome) return porNome;
         return null;
     };
 
@@ -2693,7 +2755,7 @@
     const BASE_ID = 900000000;
     let motor = {
         som: null, relogio: null, rtc: null, ligado: false, originais: null,
-        tarefas: new Map(), seq: 0, girando: false, alvo: 0, canal: null, diag: [],
+        tarefas: {}, seq: 0, girando: false, alvo: 0, canal: null, diag: [],
         ultimoPulso: 0, guarda: null, backup: null
     };
     let dialogos = null;
@@ -2790,7 +2852,7 @@
     // ── Agenda própria de tarefas ──────────────────────────────────
     const proximoVencimento = () => {
         let menor = Infinity;
-        motor.tarefas.forEach(t => { if (t.prox < menor) menor = t.prox; });
+        Object.keys(motor.tarefas).forEach(k => { const t = motor.tarefas[k]; if (t && t.prox < menor) menor = t.prox; });
         return menor;
     };
 
@@ -2799,10 +2861,12 @@
         const agora = Date.now();
         motor.ultimoPulso = agora;
         const vencidas = [];
-        motor.tarefas.forEach((t, id) => {
+        Object.keys(motor.tarefas).forEach(id => {
+            const t = motor.tarefas[id];
+            if (!t) return;
             if (agora >= t.prox) {
                 vencidas.push(t);
-                if (t.tipo === 't') motor.tarefas.delete(id);
+                if (t.tipo === 't') delete motor.tarefas[id];
                 else t.prox = agora + Math.max(t.periodo, 1);
             }
         });
@@ -2857,7 +2921,7 @@
             }
             ms = ms || 0;
             const id = BASE_ID + (++motor.seq);
-            motor.tarefas.set(id, { fn, args: args || [], tipo, periodo: ms, prox: Date.now() + ms });
+            motor.tarefas[id] = { fn, args: args || [], tipo, periodo: ms, prox: Date.now() + ms };
             if (!motor.relogio && (motor.alvo - (Date.now() + ms)) > 0) agendarPulso();
             return id;
         };
@@ -2865,11 +2929,11 @@
         window.setTimeout = function (fn, ms) { return agendar('t', fn, ms, [].slice.call(arguments, 2)); };
         window.setInterval = function (fn, ms) { return agendar('i', fn, ms, [].slice.call(arguments, 2)); };
         window.clearTimeout = function (id) {
-            if (typeof id === 'number' && id >= BASE_ID) { motor.tarefas.delete(id); return; }
+            if (typeof id === 'number' && id >= BASE_ID) { delete motor.tarefas[id]; return; }
             return ctO.call(window, id);
         };
         window.clearInterval = function (id) {
-            if (typeof id === 'number' && id >= BASE_ID) { motor.tarefas.delete(id); return; }
+            if (typeof id === 'number' && id >= BASE_ID) { delete motor.tarefas[id]; return; }
             return ciO.call(window, id);
         };
 
@@ -2910,7 +2974,7 @@
         window.setInterval = motor.originais.siO;
         window.clearTimeout = motor.originais.ctO;
         window.clearInterval = motor.originais.ciO;
-        motor.tarefas.clear();
+        motor.tarefas = {};
         motor.ligado = false;
     };
 
@@ -2940,7 +3004,7 @@
 
     // ── CAMINHO PADRÃO: robôs que já rodam na própria página ──────
     const iniciarPadrao = (nome, texto) => {
-        const antes = new Set(Array.from(document.body.children));
+        const antes = Array.from(document.body.children);
         executarRobo(nome, texto);
 
         let ciclos = 0;
@@ -2949,7 +3013,7 @@
             if (!rodando) { clearInterval(vigia); return; }
 
             Array.from(document.body.children).forEach(el => {
-                if (el !== menu && el.id !== 'cr-espelho' && !antes.has(el) && elementosRobo.indexOf(el) === -1) {
+                if (el !== menu && el.id !== 'cr-espelho' && antes.indexOf(el) === -1 && elementosRobo.indexOf(el) === -1) {
                     elementosRobo.push(el);
                     esconderElemento(el);
                 }
@@ -3036,47 +3100,76 @@
 
     // ── CAMINHO JANELA: acha a tela de autorização e pilota de fora ─
     const rodarJanela = (nome, texto) => {
+
+        const comecar = alvo => {
+            janelaUnimed = alvo;
+            const ctx = {
+                doc: () => janelaUnimed.document,
+                win: () => janelaUnimed,
+                status: t => mostrarStatus(t, '#4dc3ff'),
+                ativo: () => rodando && janelaUnimed && !janelaUnimed.closed,
+                timer: t => vigias.push(t),
+                fim: () => {
+                    rodando = false;
+                    limparVigias();
+                    encerrarModoAutomacao();
+                    modoIniciar();
+                }
+            };
+            mostrarStatus('✅ Janela de autorização encontrada. Começando...', '#2ecc71');
+            try { roboJanela[nome](texto, ctx); }
+            catch (e) { mostrarStatus('❌ ' + e.message, '#ff6b5e'); ctx.fim(); }
+        };
+
+        const encerrarSemRodar = (msg, cor) => {
+            rodando = false;
+            limparVigias();
+            encerrarModoAutomacao();
+            modoIniciar();
+            mostrarStatus(msg, cor || '#ffd633');
+        };
+
+        // Se já avisei que não achei e você clicou de novo, eu abro a janela
+        if (unimedTentouAbrir && !acharJanelaSADT()) {
+            unimedTentouAbrir = false;
+            let nova = null;
+            try { nova = window.open(URL_SADT, 'crUnimedSADT', 'width=1450,height=930,scrollbars=yes,resizable=yes'); } catch (e) { }
+            if (!nova) {
+                encerrarSemRodar('❌ O navegador bloqueou a abertura da janela.\n' +
+                    'Permita pop-ups para o site do Unimed e tente de novo.', '#ff6b5e');
+                return;
+            }
+            janelaUnimed = nova;
+            encerrarSemRodar('🪟 Abri uma janela de autorização nova (é minha, então consigo trabalhar nela).\n' +
+                'Preencha o cabeçalho da guia nessa janela e clique em INICIAR aqui de novo.', '#2ecc71');
+            return;
+        }
+
         mostrarStatus('🔍 Procurando a janela de autorização...', '#4dc3ff');
         let tentativas = 0;
         const procurar = setInterval(() => {
             if (!rodando) { clearInterval(procurar); return; }
-            const alvo = acharJanelaSADT();
 
-            if (alvo) {
-                clearInterval(procurar);
-                janelaUnimed = alvo;
-                const ctx = {
-                    doc: () => janelaUnimed.document,
-                    win: () => janelaUnimed,
-                    status: t => mostrarStatus(t, '#4dc3ff'),
-                    ativo: () => rodando && janelaUnimed && !janelaUnimed.closed,
-                    timer: t => vigias.push(t),
-                    fim: () => {
-                        rodando = false;
-                        limparVigias();
-                        encerrarModoAutomacao();
-                        modoIniciar();
-                    }
-                };
-                mostrarStatus('✅ Janela encontrada! Começando...', '#2ecc71');
-                try { roboJanela[nome](texto, ctx); }
-                catch (e) { mostrarStatus('❌ ' + e.message, '#ff6b5e'); ctx.fim(); }
-                return;
-            }
+            const alvo = acharJanelaSADT();
+            if (alvo) { clearInterval(procurar); comecar(alvo); return; }
 
             tentativas++;
-            if (tentativas === 3 || tentativas % 12 === 0) {
-                mostrarStatus('🔍 Aguardando a tela de autorização...\n' +
-                    'Abra ela pelo portal agora. Se já estiver aberta, feche e abra de novo — ' +
-                    'assim eu consigo enxergá-la.', '#ffd633');
+            if (tentativas === 4 || tentativas % 16 === 0) {
+                mostrarStatus('🔍 Procurando a janela de autorização...\n' +
+                    'Se ela já está aberta, tente fechar e abrir de novo pelo portal.', '#ffd633');
             }
-            if (tentativas > 240) {   // ~2 minutos
+            if (tentativas > 40) {           // ~20 segundos
                 clearInterval(procurar);
-                rodando = false;
-                encerrarModoAutomacao();
-                modoIniciar();
-                mostrarStatus('❌ Não encontrei a janela de autorização.\n' +
-                    'Abra a tela SP/SADT pelo portal e clique em INICIAR novamente.', '#ff6b5e');
+                unimedTentouAbrir = true;
+                encerrarSemRodar(
+                    '❌ Não alcancei a janela de autorização.\n' +
+                    '\nCAMINHO 1 (mais fácil): clique em INICIAR de novo — eu abro uma janela de autorização nova, ' +
+                    'que fica sob meu controle. Você preenche o cabeçalho nela e clica em INICIAR outra vez.\n' +
+                    '\nCAMINHO 2 (usar a janela que já está aberta): nela, aperte F12 → aba Console → cole a linha ' +
+                    'abaixo → Enter. O app abre dentro dela e aí é só escolher CNU Unimed e colar os códigos. ' +
+                    '(Na primeira vez o Chrome pede para você digitar: allow pasting)\n' +
+                    "\nfetch('https://raw.githubusercontent.com/sandrolimadf1984/central-robos/main/central.js')" +
+                    ".then(r=>r.text()).then(eval)", '#ffd633');
             }
         }, 500);
         vigias.push(procurar);
@@ -3151,6 +3244,7 @@
         ic.style.boxShadow = '0 0 12px ' + item.cor + '80';
         campoCodigos.value = '';
         unimedForcar = false;
+        unimedTentouAbrir = false;
         statusExec.style.display = 'none';
         const infoMotor = document.getElementById('cr-motor-info');
         if (infoMotor) infoMotor.innerText = '';
