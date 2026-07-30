@@ -3359,6 +3359,7 @@
         { rotulo: "Plenum",            chave: "PLENUM",           icone: "⚖️", cor: "#8e44ad", desc: "Automação para Convênios de Advocacia e Justiça" },
         { rotulo: "PM",                chave: "PM/STJ",           icone: "🛡️", cor: "#5dade2", desc: "Automação para Polícia Militar" },
         { rotulo: "Postal (Correios)", chave: "POSTAL",           icone: "✉️", cor: "#d4ac0d", desc: "Automação para Logística Postal" },
+        { rotulo: "Proasa",            chave: "CNU UNIMED",       icone: "🧪", cor: "#2e86c1", desc: "Automação para Autorizações Proasa" },
         { rotulo: "STJ",               chave: "PM/STJ",           icone: "🏛️", cor: "#4a90d9", desc: "Automação para Superior Tribunal de Justiça" },
         { rotulo: "Sul America",       chave: "SULAMERICA",       icone: "🌎", cor: "#e74c3c", desc: "Automação para Convênios SulAmérica" },
         { rotulo: "TJDF",              chave: "TJDF",             icone: "🏛️", cor: "#e67e22", desc: "Automação para Tribunal de Justiça do DF" },
