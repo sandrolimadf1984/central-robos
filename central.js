@@ -2849,20 +2849,6 @@
                     return;
                 }
 
-                // O portal recusa os códigos se o cabeçalho da guia estiver incompleto.
-                // Conferimos antes, para não sujar a guia nem tomar erro do sistema.
-                if (!unimedForcar) {
-                    const faltando = conferirCabecalho(doc());
-                    if (faltando.length) {
-                        unimedForcar = true;   // se insistir, na próxima eu sigo mesmo assim
-                        ctx.status('⚠️ Antes de lançar os códigos, preencha na janela:\n• ' +
-                            faltando.join('\n• ') +
-                            '\n\nDepois clique em INICIAR de novo.\n(Se já estiver tudo preenchido, clique em INICIAR que eu sigo mesmo assim.)');
-                        ctx.fim();
-                        return;
-                    }
-                }
-
                 for (let i = 0; i < itens.length; i++) {
                     if (!ctx.ativo()) return;
                     const item = itens[i];
