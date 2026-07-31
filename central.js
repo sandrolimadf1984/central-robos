@@ -3340,9 +3340,16 @@
         vigias.push(espera);
     };
 
-    // ── CAMINHO JANELA: acha a tela de autorização e pilota de fora ─
+    // ── CAMINHO JANELA: o app abre a tela de autorização e pilota nela ─
+    //
+    //  Por que abrir em vez de procurar: se a janela nasceu a partir de
+    //  OUTRA aba, o navegador não deixa esta aba enxergá-la de jeito
+    //  nenhum. Abrindo aqui, a janela é nossa desde o começo e sempre
+    //  funciona. Os dados do beneficiário vêm da sessão do portal, então
+    //  a guia abre com o paciente já preenchido do mesmo jeito.
+    //
     const rodarJanela = (nome, texto) => {
-        jaProcureiPorNome = false;   // uma tentativa por acionamento
+        jaProcureiPorNome = false;
 
         const comecar = alvo => {
             janelaUnimed = alvo;
@@ -3359,7 +3366,7 @@
                     modoIniciar();
                 }
             };
-            mostrarStatus('✅ Janela de autorização encontrada. Começando...', '#2ecc71');
+            mostrarStatus('✅ Janela pronta. Começando...', '#2ecc71');
             try { roboJanela[nome](texto, ctx); }
             catch (e) { mostrarStatus('❌ ' + e.message, '#ff6b5e'); ctx.fim(); }
         };
@@ -3372,50 +3379,54 @@
             mostrarStatus(msg, cor || '#ffd633');
         };
 
-        // Se já avisei que não achei e você clicou de novo, eu abro a janela
-        if (unimedTentouAbrir && !acharJanelaSADT()) {
-            unimedTentouAbrir = false;
-            let nova = null;
-            try { nova = window.open(URL_SADT, 'crUnimedSADT', 'width=1450,height=930,scrollbars=yes,resizable=yes'); } catch (e) { }
-            if (!nova) {
-                encerrarSemRodar('❌ O navegador bloqueou a abertura da janela.\n' +
-                    'Permita pop-ups para o site do Unimed e tente de novo.', '#ff6b5e');
-                return;
-            }
-            janelaUnimed = nova;
-            encerrarSemRodar('🪟 Abri uma janela de autorização nova (é minha, então consigo trabalhar nela).\n' +
-                'Preencha o cabeçalho da guia nessa janela e clique em INICIAR aqui de novo.', '#2ecc71');
+        // Espera a janela terminar de carregar a tela SP/SADT
+        const esperarJanela = () => {
+            mostrarStatus('⏳ Aguardando a tela de autorização carregar...', '#4dc3ff');
+            let t = 0;
+            const iv = setInterval(() => {
+                if (!rodando) { clearInterval(iv); return; }
+                if (!janelaUnimed || janelaUnimed.closed) {
+                    clearInterval(iv);
+                    encerrarSemRodar('❌ A janela de autorização foi fechada.\nClique em INICIAR que eu abro de novo.', '#ff6b5e');
+                    return;
+                }
+                if (serveComoSADT(janelaUnimed)) { clearInterval(iv); comecar(janelaUnimed); return; }
+                if (++t > 60) {   // 30 segundos
+                    clearInterval(iv);
+                    encerrarSemRodar('⚠️ A janela abriu, mas ainda não está na tela SP/SADT.\n' +
+                        'Deixe-a na tela de autorização e clique em INICIAR de novo.', '#ffd633');
+                }
+            }, 500);
+            vigias.push(iv);
+        };
+
+        // 1) Já tenho uma janela aberta desta sessão? uso ela.
+        if (janelaUnimed && !janelaUnimed.closed) { esperarJanela(); return; }
+
+        // 2) Alguma janela que eu consiga enxergar daqui serve?
+        const alvo = acharJanelaSADT();
+        if (alvo) { janelaUnimed = alvo; comecar(alvo); return; }
+
+        // 3) Não achei: abro eu mesmo. Isto roda dentro do clique do botão,
+        //    que é a única hora em que o navegador libera abrir janela.
+        let nova = null;
+        try {
+            nova = window.open(URL_SADT, 'crUnimedSADT',
+                'width=1460,height=940,scrollbars=yes,resizable=yes');
+        } catch (e) { }
+
+        if (!nova) {
+            encerrarSemRodar('❌ O navegador bloqueou a abertura da janela.\n' +
+                'Clique no ícone de pop-up bloqueado na barra de endereço, permita para este site, ' +
+                'e clique em INICIAR de novo.', '#ff6b5e');
             return;
         }
 
-        mostrarStatus('🔍 Procurando a janela de autorização...', '#4dc3ff');
-        let tentativas = 0;
-        const procurar = setInterval(() => {
-            if (!rodando) { clearInterval(procurar); return; }
-
-            const alvo = acharJanelaSADT();
-            if (alvo) { clearInterval(procurar); comecar(alvo); return; }
-
-            tentativas++;
-            if (tentativas === 4 || tentativas % 16 === 0) {
-                mostrarStatus('🔍 Procurando a janela de autorização...\n' +
-                    'Se ela já está aberta, tente fechar e abrir de novo pelo portal.', '#ffd633');
-            }
-            if (tentativas > 40) {           // ~20 segundos
-                clearInterval(procurar);
-                unimedTentouAbrir = true;
-                encerrarSemRodar(
-                    '❌ Não alcancei a janela de autorização.\n' +
-                    '\nCAMINHO 1 (mais fácil): clique em INICIAR de novo — eu abro uma janela de autorização nova, ' +
-                    'que fica sob meu controle. Você preenche o cabeçalho nela e clica em INICIAR outra vez.\n' +
-                    '\nCAMINHO 2 (usar a janela que já está aberta): nela, aperte F12 → aba Console → cole a linha ' +
-                    'abaixo → Enter. O app abre dentro dela e aí é só escolher CNU Unimed e colar os códigos. ' +
-                    '(Na primeira vez o Chrome pede para você digitar: allow pasting)\n' +
-                    "\nfetch('https://raw.githubusercontent.com/sandrolimadf1984/central-robos/main/central.js')" +
-                    ".then(r=>r.text()).then(eval)", '#ffd633');
-            }
-        }, 500);
-        vigias.push(procurar);
+        janelaUnimed = nova;
+        encerrarSemRodar('🪟 Abri a janela de autorização — agora ela é minha e eu consigo trabalhar nela.\n\n' +
+            '1) Confira o cabeçalho da guia nessa janela nova\n' +
+            '2) Volte aqui e clique em INICIAR\n\n' +
+            'Pode fechar a janela antiga: esta abre com os mesmos dados do paciente.', '#2ecc71');
     };
 
     // ── INICIAR: roda o robô sem sair desta janela ────────────────
