@@ -464,9 +464,7 @@
             const reTarget = /\.target\s*=\s*['"]([^'"]+)['"]/g;
             while ((m = reTarget.exec(texto))) guardar(m[1]);
         } catch (e) { }
-        ['SADT', 'sadt', 'popup', 'Popup', 'janela', 'Janela', 'win', 'novaJanela',
-         'solicitacao', 'Solicitacao', 'guia', 'Guia', 'principal'].forEach(guardar);
-        return achados;
+        return achados;   // só nomes que existem mesmo na página — nada de chute
     };
 
     const serveComoSADT = w => {
@@ -477,18 +475,28 @@
         } catch (e) { return false; }
     };
 
+    // ATENÇÃO: procurar pelo nome pode fazer o navegador ABRIR uma janela quando
+    // o nome não existe. Por isso isto roda UMA VEZ por acionamento, com teto de
+    // tentativas, e fecha sem dó qualquer janela que tenha nascido aqui.
+    let jaProcureiPorNome = false;
     const tentarPorNome = () => {
-        for (const n of nomesDeJanela()) {
+        if (jaProcureiPorNome) return null;
+        jaProcureiPorNome = true;
+        const nomes = nomesDeJanela().slice(0, 4);
+        for (const n of nomes) {
             let w = null;
             try { w = window.open('', n); } catch (e) { continue; }
             if (!w || w === window) continue;
             if (serveComoSADT(w)) return w;
-            // não era ela: se foi uma janela em branco que acabei de criar, fecho
+            // não era ela: fecha (o navegador só deixa fechar o que foi aberto por script)
             try {
-                const vazia = (w.location.href === 'about:blank') &&
-                    (!w.document || !w.document.body || !(w.document.body.innerHTML || '').trim());
-                if (vazia) w.close();
-            } catch (e) { }
+                const href = (w.location && w.location.href) || '';
+                if (!href || href === 'about:blank') { w.close(); continue; }
+            } catch (e) {
+                try { w.close(); } catch (e2) { }   // página nova do navegador: fecha
+                continue;
+            }
+            try { w.close(); } catch (e) { }
         }
         return null;
     };
@@ -3334,6 +3342,7 @@
 
     // ── CAMINHO JANELA: acha a tela de autorização e pilota de fora ─
     const rodarJanela = (nome, texto) => {
+        jaProcureiPorNome = false;   // uma tentativa por acionamento
 
         const comecar = alvo => {
             janelaUnimed = alvo;
