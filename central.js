@@ -786,7 +786,17 @@
                     inputField.dispatchEvent(new Event('focusout', { bubbles: true }));
                     document.body.click();
                     await delay(2000);
-                    const radioBtn = document.querySelector('#procedimentosPesquisados > tbody > tr:nth-child(2) > td:nth-child(1) > input[type=radio]');
+                    // Prefere a linha que realmente contém ESTE código. A linha fixa
+                    // (nth-child(2)) pega sempre a primeira do resultado, que pode ser
+                    // outro exame quando a busca devolve mais de um.
+                    let radioBtn = null;
+                    for (const tr of document.querySelectorAll('#procedimentosPesquisados > tbody > tr')) {
+                        if ((tr.innerText || tr.textContent || '').includes(code)) {
+                            const r = tr.querySelector('input[type=radio]');
+                            if (r) { radioBtn = r; break; }
+                        }
+                    }
+                    if (!radioBtn) radioBtn = document.querySelector('#procedimentosPesquisados > tbody > tr:nth-child(2) > td:nth-child(1) > input[type=radio]');
                     if (radioBtn) radioBtn.click();
                     await delay(500);
                     const qtdField = document.querySelector('#quantidadeProcedimento');
@@ -1041,7 +1051,19 @@
                 const selecionarTabelaTJDF = () => {
                     setStatus('aguardando tabela');
                     obsTabelaAtual = new MutationObserver(() => {
-                        const celula = document.querySelector('#result-body-table > tr.dataGridRow.ng-scope.kb-active > td:nth-child(2)');
+                        // Prefere a linha que contém ESTE código. A classe kb-active é a
+                        // linha destacada, que pode ser a da busca anterior.
+                        const codTJ = (codigos[idx] || {}).cod;
+                        let celula = null;
+                        if (codTJ) {
+                            for (const tr of document.querySelectorAll('#result-body-table > tr.dataGridRow')) {
+                                if ((tr.innerText || tr.textContent || '').includes(codTJ)) {
+                                    celula = tr.querySelector('td:nth-child(2)');
+                                    if (celula) break;
+                                }
+                            }
+                        }
+                        if (!celula) celula = document.querySelector('#result-body-table > tr.dataGridRow.ng-scope.kb-active > td:nth-child(2)');
                         if (celula) {
                             celula.click();
                             obsTabelaAtual.disconnect();
@@ -1175,8 +1197,17 @@
                             if (item.qtd > 1) {
                                 let tries = 0;
                                 let qCheck = setInterval(() => {
+                                    // Prefere o bloco que contém ESTE código; o índice do laço
+                                    // erra a linha se o portal reordenar ou pular algum item.
+                                    let inputQtd = null;
+                                    for (const bloco of document.querySelectorAll("#stepDadosSolicitacaoForm > bc-guia-eventos-exibicao-termos-selecionados > div > div.ng-scope")) {
+                                        if ((bloco.innerText || bloco.textContent || '').includes(v)) {
+                                            const qq = bloco.querySelector('div.form-group > div.size-1.no-rpadding > input');
+                                            if (qq) { inputQtd = qq; break; }
+                                        }
+                                    }
                                     let inputs = document.querySelectorAll("#stepDadosSolicitacaoForm > bc-guia-eventos-exibicao-termos-selecionados > div > div.ng-scope > div.form-group > div.size-1.no-rpadding > input");
-                                    let inputQtd = inputs[i];
+                                    if (!inputQtd) inputQtd = inputs[i];
                                     if (inputQtd) {
                                         clearInterval(qCheck);
                                         inputQtd.value = item.qtd;
@@ -1227,8 +1258,16 @@
                             await new Promise(r => setTimeout(r, TEMPO));
                             if (item.qtd > 1) {
                                 await new Promise(r => setTimeout(r, 150));
+                                // Prefere a linha da tabela que contém ESTE código
+                                let qInpt = null;
+                                for (const tr of document.querySelectorAll('#tabelaSolicitaProcedimento > tbody > tr')) {
+                                    if ((tr.innerText || tr.textContent || '').includes(item.cod)) {
+                                        const qq = tr.querySelector('td:nth-child(5) > input');
+                                        if (qq) { qInpt = qq; break; }
+                                    }
+                                }
                                 let qInps = document.querySelectorAll(selQtd);
-                                let qInpt = qInps[i] || qInps[qInps.length - 1];
+                                if (!qInpt) qInpt = qInps[i] || qInps[qInps.length - 1];
                                 if (qInpt) {
                                     qInpt.value = item.qtd;
                                     qInpt.dispatchEvent(new Event('input', { bubbles: true }));
@@ -1361,7 +1400,9 @@
                         
                         let nomeEncontrado = false;
                         let tentativasDeReinsercao = 0;
-                        while (!nomeEncontrado) {
+                        // Teto de tentativas: sem isto, se o nome do exame nunca voltasse
+                        // o robô ficava tentando o mesmo código para sempre e travava a aba.
+                        while (!nomeEncontrado && tentativasDeReinsercao < 4) {
                             var inp = document.querySelector(seletorInputAmil);
                             if (!inp) { inp = document.querySelector('#inclusao-consulta-pedido input[type="text"]'); }
                             if (!inp) { alert('ERRO: Campo INPUT não encontrado!'); break; }
@@ -1403,6 +1444,12 @@
                             }
                         }
                         
+                        if (!nomeEncontrado) {
+                            // O nome não veio: não salvo nada, senão entraria o exame errado.
+                            log.innerText = '⚠️ ' + c + ' não carregou — pulei este código.';
+                            await new Promise(r => setTimeout(r, 400));
+                            continue;
+                        }
                         log.innerText = 'Nome carregado! Processando: ' + c + ' (' + (i + 1) + '/' + l.length + ')' + (q > 1 ? ' Qtd: ' + q : '');
                         
                         if (q > 1) {
@@ -1565,26 +1612,76 @@
                         return !1;
                     };
                     
+                    // Clica numa opção da lista sem tirar o foco do campo.
+                    // O mouseover vem antes de propósito: é ele que destaca a
+                    // opção certa na lista (a mesma coisa que passar o mouse).
+                    const clicarOpcao = el => {
+                        if (!el) return !1;
+                        try {
+                            el.scrollIntoView({ block: 'center' });
+                            el.dispatchEvent(new MouseEvent('mousemove', { bubbles: !0 }));
+                            el.dispatchEvent(new MouseEvent('mouseover', { bubbles: !0 }));
+                            el.dispatchEvent(new MouseEvent('mousedown', { bubbles: !0, button: 0 }));
+                            el.dispatchEvent(new MouseEvent('mouseup', { bubbles: !0, button: 0 }));
+                            el.dispatchEvent(new MouseEvent('click', { bubbles: !0, button: 0 }));
+                            return !0;
+                        } catch (e) { return !1; }
+                    };
+
+                    const opcoesNaTela = () =>
+                        Array.from(document.querySelectorAll('[id^="react-select-"][id*="-option"]'));
+
                     const fill = async (cod, qty) => {
                         const inp = getInput();
                         if (!inp) return !1;
                         click(inp);
                         await wait(100);
                         const s = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+
+                        // Limpa o campo e espera a lista da busca ANTERIOR sumir.
+                        // Sem isso, a lista velha ainda está na tela quando o código
+                        // novo é digitado — e acabamos escolhendo o exame errado.
+                        s.call(inp, '');
+                        inp.dispatchEvent(new InputEvent('input', { bubbles: !0 }));
+                        for (let w = 0; w < 15; w++) {
+                            if (!isRunning) return !1;
+                            if (opcoesNaTela().length === 0) break;
+                            await wait(100);
+                        }
+
                         s.call(inp, cod);
                         inp.dispatchEvent(new InputEvent('input', { bubbles: !0, inputType: 'insertFromPaste', data: cod }));
-                        let menuCarregou = false;
+
+                        // Espera aparecer a opção QUE CONTÉM ESTE código
+                        let alvo = null;
                         for (let w = 0; w < 50; w++) {
                             if (!isRunning) return !1;
-                            let opcoesDrop = document.querySelectorAll('[id^="react-select-"][id*="-option"]');
-                            if (opcoesDrop.length > 0) {
-                                let achou = Array.from(opcoesDrop).find(o => o.innerText.includes(cod));
-                                if (achou) { menuCarregou = true; break; }
-                            }
+                            alvo = opcoesNaTela().find(o => (o.innerText || '').includes(cod));
+                            if (alvo) break;
                             await wait(200);
                         }
-                        if (!menuCarregou) { await wait(1000); } else { await wait(300); }
-                        inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: !0 }));
+
+                        if (alvo) {
+                            await wait(200);
+                            // Relê a lista: entre a espera e o clique ela pode ter mudado
+                            const certa = opcoesNaTela().find(o => (o.innerText || '').includes(cod)) || alvo;
+                            clicarOpcao(certa);
+                            await wait(200);
+                            // Se ainda houver lista aberta, o clique não pegou: agora o
+                            // Enter é seguro, porque o mouseover já destacou a opção certa.
+                            if (opcoesNaTela().length > 0) {
+                                inp.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: !0 }));
+                            }
+                        } else {
+                            // Não achei a opção deste código: NÃO aperto Enter às cegas,
+                            // senão entra o exame que estiver destacado (era isso que
+                            // repetia um exame e pulava outro). Deixo para a conferência
+                            // do final reinserir este código.
+                            await wait(300);
+                            s.call(inp, '');
+                            inp.dispatchEvent(new InputEvent('input', { bubbles: !0 }));
+                            return !1;
+                        }
                         await wait(300);
                         const lp = getLupa(inp);
                         if (lp) {
@@ -1886,7 +1983,24 @@
                             inpng.click();
                             inpng.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
                             await wait(500);
-                            inpng.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true }));
+                            // Prefere clicar na opção que contém ESTE código. O Enter escolhe
+                            // a opção destacada, que pode ser de outro exame.
+                            let opcTRT = null;
+                            for (let t = 0; t < 12; t++) {
+                                opcTRT = Array.from(document.querySelectorAll('.ng-option, ng-dropdown-panel [role="option"], [role="option"]'))
+                                    .find(o => (o.innerText || o.textContent || '').includes(c));
+                                if (opcTRT) break;
+                                await wait(200);
+                            }
+                            if (opcTRT) {
+                                try { opcTRT.scrollIntoView({ block: 'center' }); } catch (e) { }
+                                opcTRT.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+                                opcTRT.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                                opcTRT.dispatchEvent(new MouseEvent('mouseup', { bubbles: true }));
+                                opcTRT.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+                            } else {
+                                inpng.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', keyCode: 13, bubbles: true }));
+                            }
                         }
                         
                         await wait(1000);
@@ -2007,9 +2121,24 @@
                         if(menuVisivel){dropItem=menuVisivel;break;}
                         await wait(1);
                     }
+                    // Prefere clicar no item da lista que contém ESTE código.
+                    // O Enter escolhe o item destacado, que pode ser de outro exame.
+                    let itemCerto=null;
+                    if(dropItem){
+                        itemCerto=Array.from(dropItem.querySelectorAll('li,a,div'))
+                            .find(el=>(el.innerText||el.textContent||'').includes(c));
+                    }
+                    if(itemCerto){
+                        try{itemCerto.scrollIntoView({block:'center'});}catch(e){}
+                        itemCerto.dispatchEvent(new MouseEvent('mouseover',{bubbles:true}));
+                        itemCerto.dispatchEvent(new MouseEvent('mousedown',{bubbles:true}));
+                        itemCerto.dispatchEvent(new MouseEvent('mouseup',{bubbles:true}));
+                        itemCerto.dispatchEvent(new MouseEvent('click',{bubbles:true}));
+                    }else{
                     inpCod.dispatchEvent(new KeyboardEvent('keydown',{key:'Enter',keyCode:13,bubbles:true}));
                     inpCod.dispatchEvent(new KeyboardEvent('keypress',{key:'Enter',keyCode:13,bubbles:true}));
                     inpCod.dispatchEvent(new KeyboardEvent('keyup',{key:'Enter',keyCode:13,bubbles:true}));
+                    }
                     if(typeof window.$!=='undefined'){
                         try{window.$(inpCod).trigger(window.$.Event('keydown',{keyCode:13})).trigger(window.$.Event('keypress',{keyCode:13})).trigger(window.$.Event('keyup',{keyCode:13}));}catch(e){}
                     }
