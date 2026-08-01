@@ -1561,23 +1561,74 @@
                         return l;
                     };
                     
+                    // Rede de segurança: se a caixa "Anexar arquivo" abrir por qualquer
+                    // motivo, ela trava a tela inteira. Fecha e segue o lote.
+                    const modalAnexoAberto = () => {
+                        try {
+                            return Array.from(document.querySelectorAll('div,p,span,h1,h2,h3,h4'))
+                                .some(e => /selecione o tipo de documento/i.test(e.textContent || '')
+                                        && e.getBoundingClientRect().width > 0);
+                        } catch (e) { return !1; }
+                    };
+                    const fecharModalAnexo = async () => {
+                        if (!modalAnexoAberto()) return !1;
+                        const cancelar = Array.from(document.querySelectorAll('button'))
+                            .find(b => /^cancelar$/i.test((b.textContent || '').trim())
+                                    && b.getBoundingClientRect().width > 0);
+                        if (cancelar) { cancelar.click(); }
+                        else { document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: !0 })); }
+                        await wait(400);
+                        return !0;
+                    };
+
                     const getInput = () => {
                         const i = document.querySelectorAll('input[id^="react-select-"][id$="-input"]');
                         const v = Array.from(i).filter(e => e.getBoundingClientRect().width > 0);
                         return v.length ? v[v.length - 1] : null;
                     };
                     
+                    // Botões em que o robô NUNCA pode clicar por engano.
+                    // Era isso que abria a caixa "Anexar arquivo" no meio do lote.
+                    const PROIBIDO = /anexar|anexo|remover|excluir|deletar|apagar|lixeira|pr[oó]ximo|voltar|cancelar|concluir|salvar|finalizar|enviar|sair|fechar/i;
+                    const botaoSeguro = b => {
+                        if (!b) return !1;
+                        const t = ((b.textContent || '') + ' ' +
+                                   (b.getAttribute('aria-label') || '') + ' ' +
+                                   (b.getAttribute('title') || '') + ' ' +
+                                   (b.className || '')).toLowerCase();
+                        return !PROIBIDO.test(t);
+                    };
+
+                    // Acha o campo "Quantidade" pela etiqueta dele, e não pelo
+                    // "último ícone da página" — que na prática caía no anexo.
+                    const getCaixaQtd = () => {
+                        try {
+                            const marcas = Array.from(document.querySelectorAll('label,span,div,p'))
+                                .filter(e => /^quantidade\s*\*?$/i.test((e.textContent || '').trim())
+                                          && e.getBoundingClientRect().width > 0);
+                            for (const m of marcas) {
+                                let caixa = m;
+                                for (let k = 0; k < 5 && caixa; k++) {
+                                    const inpQ = caixa.querySelector('input');
+                                    const btns = Array.from(caixa.querySelectorAll('button')).filter(botaoSeguro);
+                                    if (inpQ && btns.length) return { inp: inpQ, btns };
+                                    caixa = caixa.parentElement;
+                                }
+                            }
+                        } catch (e) { }
+                        return null;
+                    };
+
                     const getLupa = ref => {
                         if (!ref) return null;
                         let f = ref.closest('form');
                         if (f) {
                             let s = f.querySelector('button[type="submit"]');
-                            if (s) return s;
+                            if (s && botaoSeguro(s)) return s;
                             let bs = f.querySelectorAll('button');
-                            for (let b of bs) if (b.querySelector('svg')) return b;
+                            for (let b of bs) if (b.querySelector('svg') && botaoSeguro(b)) return b;
                         }
-                        const vs = Array.from(document.querySelectorAll('svg')).reverse().find(s => s.getBoundingClientRect().width > 0 && s.closest('button'));
-                        return vs ? vs.closest('button') : null;
+                        return null;   // sem chutar pela página inteira
                     };
                     
                     const getAdd = () => {
@@ -1632,6 +1683,7 @@
                         Array.from(document.querySelectorAll('[id^="react-select-"][id*="-option"]'));
 
                     const fill = async (cod, qty) => {
+                        await fecharModalAnexo();
                         const inp = getInput();
                         if (!inp) return !1;
                         click(inp);
@@ -1683,17 +1735,56 @@
                             return !1;
                         }
                         await wait(300);
-                        const lp = getLupa(inp);
-                        if (lp) {
-                            for (let q = 0; q < qty; q++) {
-                                if (!isRunning) return !1;
-                                click(lp);
-                                await wait(250);
+                        // ── Quantidade ──
+                        const cx = getCaixaQtd();
+                        let qtdOk = !1;
+                        if (cx) {
+                            // 1º) tenta digitar direto no campo
+                            if (!cx.inp.readOnly && !cx.inp.disabled) {
+                                try {
+                                    const setQ = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+                                    cx.inp.focus();
+                                    setQ.call(cx.inp, String(qty));
+                                    cx.inp.dispatchEvent(new InputEvent('input', { bubbles: !0 }));
+                                    cx.inp.dispatchEvent(new Event('change', { bubbles: !0 }));
+                                    await wait(200);
+                                    if (String(cx.inp.value).replace(/\D/g, '') === String(qty)) qtdOk = !0;
+                                } catch (e) { }
+                            }
+                            // 2º) senão, clica no "+" da própria caixa de quantidade
+                            if (!qtdOk) {
+                                const mais = cx.btns.find(b => (b.textContent || '').trim() === '+')
+                                    || cx.btns.find(b => /mais|plus|add|increment|aumentar/i.test(
+                                        (b.getAttribute('aria-label') || '') + ' ' + (b.className || '')))
+                                    || cx.btns[cx.btns.length - 1];
+                                if (mais) {
+                                    const atual = parseInt(String(cx.inp.value || '0').replace(/\D/g, ''), 10) || 0;
+                                    for (let q = atual; q < qty; q++) {
+                                        if (!isRunning) return !1;
+                                        click(mais);
+                                        await wait(220);
+                                    }
+                                    qtdOk = !0;
+                                }
+                            }
+                        }
+                        // 3º) último recurso: botão do próprio formulário (nunca o de anexo)
+                        if (!qtdOk) {
+                            const lp = getLupa(inp);
+                            if (lp) {
+                                for (let q = 0; q < qty; q++) {
+                                    if (!isRunning) return !1;
+                                    click(lp);
+                                    await wait(250);
+                                }
                             }
                         }
                         await wait(100);
+                        await fecharModalAnexo();
                         const ad = getAdd() || document.querySelector('[class="button-add"]');
                         if (ad) click(ad);
+                        await wait(150);
+                        await fecharModalAnexo();
                         return !0;
                     };
                     
