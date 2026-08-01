@@ -2416,6 +2416,11 @@
         "TRT": "g-status"
     };
 
+    // Robôs cujo contador fica num elemento separado do status
+    const contadorRobo = {
+        "TJDF": "b403-contador"
+    };
+
     // ── ESTADO DA EXECUÇÃO ────────────────────────────────────────
     let rodando = false;
     let elementosRobo = [];
@@ -3428,10 +3433,14 @@
 
     // Avisos do robô não podem travar a aba quando ela está no fundo:
     // em vez de caixinha do navegador, a mensagem aparece aqui no painel.
+    let ultimoAviso = '';
+
     const silenciarAvisos = () => {
         if (dialogos) return;
         dialogos = { alerta: window.alert, pergunta: window.confirm };
-        window.alert = msg => mostrarStatus(String(msg), '#4dc3ff');
+        // Robôs sem painel próprio avisam o fim por alerta — guardamos a
+        // mensagem para saber que a automação acabou.
+        window.alert = msg => { ultimoAviso = String(msg); mostrarStatus(String(msg), '#4dc3ff'); };
         window.confirm = msg => {
             mostrarStatus('⚠️ ' + String(msg) + ' → seguindo em frente automaticamente', '#ffd633');
             return true;
@@ -3453,10 +3462,40 @@
     // ── CAMINHO PADRÃO: robôs que já rodam na própria página ──────
     const iniciarPadrao = (nome, texto) => {
         const antes = Array.from(document.body.children);
+
+        // Lista de códigos deste lote, para conseguir contar o progresso
+        // mesmo nos robôs que não mostram contagem nenhuma.
+        const brutos = (texto || '').match(/\b\d{8}\b/g) || [];
+        const doLote = [];
+        brutos.forEach(c => { if (doLote.indexOf(c) === -1) doLote.push(c); });
+        const total = doLote.length;
+
+        // Texto do portal, sem contar o painel do app nem os painéis dos robôs
+        const textoDoPortal = () => {
+            let t = '';
+            try {
+                Array.from(document.body.children).forEach(el => {
+                    if (el === menu || elementosRobo.indexOf(el) !== -1) return;
+                    t += ' ' + (el.innerText || el.textContent || '');
+                });
+            } catch (e) { }
+            return t;
+        };
+
+        const encerrar = (msg, cor) => {
+            rodando = false;
+            limparVigias();
+            encerrarModoAutomacao();
+            modoIniciar();
+            mostrarStatus(msg, cor || '#2ecc71');
+        };
+
         executarRobo(nome, texto);
 
-        let ciclos = 0;
+        let ciclos = 0, feitos = 0, iguais = 0;
         const idStatus = statusRobo[nome];
+        const idContador = contadorRobo[nome];
+
         const vigia = setInterval(() => {
             if (!rodando) { clearInterval(vigia); return; }
 
@@ -3467,25 +3506,60 @@
                 }
             });
 
+            // Conta quantos códigos do lote já aparecem na tela do portal
+            if (total && ciclos % 3 === 0) {
+                const pag = textoDoPortal();
+                const agora = doLote.filter(c => pag.indexOf(c) !== -1).length;
+                if (agora === feitos) { iguais++; } else { feitos = agora; iguais = 0; }
+            }
+            const contagem = total ? ('📋 ' + feitos + '/' + total + ' códigos lançados no portal') : '';
+
+            // Recontagem na hora, para o número final sair exato
+            const contagemAgora = () => {
+                if (!total) return '';
+                const pag = textoDoPortal();
+                feitos = doLote.filter(c => pag.indexOf(c) !== -1).length;
+                return '📋 ' + feitos + '/' + total + ' códigos lançados no portal';
+            };
+
+            // 1) O robô avisou alguma coisa? Para estes robôs, isso é o fim.
+            if (ultimoAviso) {
+                const fimBom = /✅|conclu|finaliz|fim|sucesso/i.test(ultimoAviso);
+                clearInterval(vigia);
+                const cFinal = contagemAgora();
+                encerrar((fimBom ? '✅ ' : '⚠️ ') + ultimoAviso + (cFinal ? '\n' + cFinal : ''),
+                    fimBom ? '#2ecc71' : '#ffd633');
+                return;
+            }
+
+            // 2) Robô com painel próprio: espelha o texto dele
             if (idStatus) {
                 const alvo = document.getElementById(idStatus);
                 if (alvo) {
-                    const txt = (alvo.innerText || '').trim();
+                    let txt = (alvo.innerText || '').trim();
+                    const cEl = idContador ? document.getElementById(idContador) : null;
+                    const cTxt = cEl ? (cEl.innerText || '').trim() : '';
                     if (txt) {
-                        mostrarStatus(txt, '#4dc3ff');
+                        mostrarStatus(txt + (cTxt ? '  (' + cTxt + ')' : '') + (contagem ? '\n' + contagem : ''), '#4dc3ff');
                         if (/✅|conclu|finaliz|FIM/i.test(txt)) {
-                            rodando = false;
                             clearInterval(vigia);
-                            limparVigias();
-                            encerrarModoAutomacao();
-                            modoIniciar();
-                            mostrarStatus('✅ Automação concluída!', '#2ecc71');
+                            const cF = contagemAgora();
+                            encerrar('✅ Automação concluída!' + (cF ? '\n' + cF : ''), '#2ecc71');
                             return;
                         }
                     }
                 }
-            } else if (ciclos === 3) {
-                mostrarStatus('▶ Automação em andamento no portal...', '#4dc3ff');
+            } else {
+                // 3) Robô sem painel: mostramos a contagem que calculamos
+                if (ciclos >= 2) {
+                    mostrarStatus('⏳ Automação em andamento no portal...' + (contagem ? '\n' + contagem : ''), '#4dc3ff');
+                }
+                // Todos os códigos já na tela e parou de crescer: terminou
+                if (total && feitos >= total && iguais >= 4) {
+                    clearInterval(vigia);
+                    encerrar('✅ Automação concluída!\n' + contagemAgora(), '#2ecc71');
+                    return;
+                }
             }
 
             if (++ciclos > 7200) clearInterval(vigia);
@@ -3640,6 +3714,7 @@
         rodando = true;
         elementosRobo = [];
         janelasRobo = [];
+        ultimoAviso = '';
         modoParar();
         try { ligarMotorFundo(); } catch (e) { console.log('motor de fundo indisponível:', e.message); }
         try { silenciarAvisos(); } catch (e) { console.log('aviso:', e.message); }
