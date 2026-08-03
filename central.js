@@ -2208,7 +2208,10 @@
                     for(let k=0;k<1500;k++){
                         if(await checkModal())break;
                         let drops=Array.from(document.querySelectorAll('ul[id^="ui-id-"]'));
-                        let menuVisivel=drops.find(el=>el.offsetParent!==null);
+                        // Espera a lista aparecer JÁ COM OPÇÕES. Só checar se ela
+                        // existe não basta: entre uma busca e outra ela fica na
+                        // página vazia, e o robô escolhia antes das opções chegarem.
+                        let menuVisivel=drops.find(el=>el.offsetParent!==null&&el.querySelector('li'));
                         if(menuVisivel){dropItem=menuVisivel;break;}
                         await wait(1);
                     }
@@ -2621,7 +2624,10 @@
             ctx.timer(t);
         },
 
-        "TRF": (texto, ctx) => {
+        // DESATIVADO: a versão de moldura errava o campo "Item de custo".
+        // Com este nome o app não a encontra e usa o robô TRF original,
+        // que tem a correção automática desse campo e funciona.
+        "TRF_DESATIVADO_USA_O_ORIGINAL": (texto, ctx) => {
             var cods = texto.match(/\b\d{8}\b/g);
             if (!cods) { alert("Nenhum código!"); ctx.fim(); return; }
             var counts = {};
@@ -3460,6 +3466,20 @@
     };
 
     // ── CAMINHO PADRÃO: robôs que já rodam na própria página ──────
+    // Só é painel do robô quem contém os elementos que o próprio robô criou
+    // (a caixa de códigos, o botão de iniciar ou o texto de status dele).
+    const ehPainelDoRobo = (el, nome) => {
+        try {
+            const inf = infoRobos[nome] || {};
+            const ids = [inf.txt, inf.btn, statusRobo[nome], contadorRobo[nome]].filter(Boolean);
+            for (const id of ids) {
+                if (el.id === id) return true;
+                if (el.querySelector && el.querySelector('[id="' + id + '"]')) return true;
+            }
+        } catch (e) { }
+        return false;
+    };
+
     const iniciarPadrao = (nome, texto) => {
         const antes = Array.from(document.body.children);
 
@@ -3477,6 +3497,16 @@
                 Array.from(document.body.children).forEach(el => {
                     if (el === menu || elementosRobo.indexOf(el) !== -1) return;
                     t += ' ' + (el.innerText || el.textContent || '');
+                    // Em vários portais (PM, MedSenior, TJ, Unimed Seguros) o código
+                    // fica DENTRO de um campo — e o texto da página não mostra isso.
+                    if (el.querySelectorAll) {
+                        el.querySelectorAll('input,textarea,select').forEach(c => {
+                            t += ' ' + (c.value || '');
+                            if (c.tagName === 'SELECT' && c.options && c.selectedIndex >= 0) {
+                                t += ' ' + ((c.options[c.selectedIndex] || {}).textContent || '');
+                            }
+                        });
+                    }
                 });
             } catch (e) { }
             return t;
@@ -3499,15 +3529,19 @@
         const vigia = setInterval(() => {
             if (!rodando) { clearInterval(vigia); return; }
 
+            // Esconde APENAS o painel do próprio robô. Antes escondia qualquer
+            // coisa nova no corpo da página — inclusive a lista de sugestões que
+            // o portal cria (ASSEFAZ e afins), e o robô ficava travado no 1º código.
             Array.from(document.body.children).forEach(el => {
-                if (el !== menu && el.id !== 'cr-espelho' && antes.indexOf(el) === -1 && elementosRobo.indexOf(el) === -1) {
-                    elementosRobo.push(el);
-                    esconderElemento(el);
-                }
+                if (el === menu || el.id === 'cr-espelho') return;
+                if (antes.indexOf(el) !== -1 || elementosRobo.indexOf(el) !== -1) return;
+                if (!ehPainelDoRobo(el, nome)) return;
+                elementosRobo.push(el);
+                esconderElemento(el);
             });
 
             // Conta quantos códigos do lote já aparecem na tela do portal
-            if (total && ciclos % 3 === 0) {
+            if (total && ciclos % 2 === 0) {
                 const pag = textoDoPortal();
                 const agora = doLote.filter(c => pag.indexOf(c) !== -1).length;
                 if (agora === feitos) { iguais++; } else { feitos = agora; iguais = 0; }
