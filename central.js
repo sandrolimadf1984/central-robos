@@ -1371,146 +1371,161 @@
             (function () {
                 var d = document.createElement('div');
                 d.style.cssText = 'position:fixed;top:10px;right:10px;width:300px;background:#fff;border:3px solid #d63384;padding:10px;z-index:999999;font-family:Arial;box-shadow:0 0 15px rgba(0,0,0,0.5)';
-                d.innerHTML = '<h3 style="margin:0;color:#d63384">Lançador Amil (Rápido)</h3><p style="font-size:12px;margin:5px 0">Cola > Checa rápido o nome > Salva.</p><textarea id="tc" style="width:100%;height:100px" placeholder="Cole os códigos de 8 dígitos..."></textarea><button id="bi" style="margin-top:5px;width:100%;padding:10px;background:#28a745;color:white;cursor:pointer;font-weight:bold;border:none">INICIAR</button><button onclick="this.parentElement.remove()" style="margin-top:5px;width:100%;cursor:pointer">FECHAR</button><div id="lg" style="font-size:11px;margin-top:5px;color:red;font-weight:bold"></div>';
+                d.innerHTML = '<h3 style="margin:0;color:#d63384">Lançador Amil</h3><p style="font-size:12px;margin:5px 0">Código &gt; espera o nome &gt; quantidade &gt; incluir.</p><textarea id="tc" style="width:100%;height:100px" placeholder="Cole os códigos de 8 dígitos..."></textarea><button id="bi" style="margin-top:5px;width:100%;padding:10px;background:#28a745;color:white;cursor:pointer;font-weight:bold;border:none">INICIAR</button><button onclick="this.parentElement.remove()" style="margin-top:5px;width:100%;cursor:pointer">FECHAR</button><div id="lg" style="font-size:11px;margin-top:5px;color:#d63384;font-weight:bold"></div>';
                 document.body.appendChild(d);
-                
+
                 document.getElementById('bi').onclick = async () => {
                     var t = document.getElementById('tc').value;
                     var raw = t.match(/\b\d{8}\b/g);
                     var log = document.getElementById('lg');
-                    
-                    if (!raw || raw.length == 0) {
-                        alert('Nenhum código de 8 dígitos encontrado!');
-                        return;
-                    }
-                    
+                    if (!raw || raw.length == 0) { alert('Nenhum código de 8 dígitos encontrado!'); return; }
                     document.getElementById('bi').disabled = true;
+
                     var counts = {};
                     raw.forEach(x => counts[x] = (counts[x] || 0) + 1);
                     var unicos = [...new Set(raw)];
                     var order = unicos.filter(c => counts[c] === 1).concat(unicos.filter(c => counts[c] > 1));
                     var l = order.map(k => ({ cod: k, qtd: counts[k] }));
-                    
+
+                    const wait = ms => new Promise(r => setTimeout(r, ms));
+                    // O portal é Angular: mexer no valor pelo "setter nativo" é o
+                    // único jeito de a tela realmente enxergar o que foi digitado.
+                    const setNativo = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+                    const SEL_COD = '#inclusao-consulta-pedido > section > as-tipo-pedido-sadt > div.procedimentos-servicos.card-config > as-procedimento-servico > div > ul > li > as-procedimento-autocomplete > div > div > input';
+
+                    const visivel = e => { try { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; } catch (x) { return false; } };
+
+                    const campoCodigo = () =>
+                        document.querySelector(SEL_COD)
+                        || document.querySelector('as-procedimento-autocomplete input')
+                        || document.querySelector('#inclusao-consulta-pedido input[type="text"]');
+
+                    const campoQtd = () => {
+                        let q = document.querySelector('#quantidade-procedimento');
+                        if (q) return q;
+                        const cod = campoCodigo();
+                        if (!cod) return null;
+                        // reserva: o campo logo ao lado do código
+                        const caixa = cod.closest('li') || cod.closest('div') || document;
+                        const raiz = caixa.parentElement || caixa;
+                        const ins = Array.from(raiz.querySelectorAll('input')).filter(e => visivel(e) && !e.disabled && !e.readOnly);
+                        const k = ins.indexOf(cod);
+                        return (k >= 0 && ins[k + 1]) ? ins[k + 1] : null;
+                    };
+
+                    const botaoIncluir = () => {
+                        let b = document.querySelector('#inclusao-consulta-pedido > section > as-tipo-pedido-sadt > div.procedimentos-servicos.card-config > as-procedimento-servico > div > div > button');
+                        if (b && visivel(b)) return b;
+                        return Array.from(document.querySelectorAll('button'))
+                            .find(x => /incluir\s+procedimento/i.test(x.textContent || '') && visivel(x));
+                    };
+
+                    const escrever = (el, v) => {
+                        try { el.focus(); } catch (e) { }
+                        try { setNativo.call(el, v); } catch (e) { el.value = v; }
+                        el.dispatchEvent(new Event('input', { bubbles: true }));
+                        el.dispatchEvent(new Event('change', { bubbles: true }));
+                    };
+
+                    const opcoes = () => Array.from(document.querySelectorAll(
+                        '[role="option"],li[role="option"],mat-option,.autocomplete-item,.dropdown-item,as-procedimento-autocomplete li'))
+                        .filter(visivel);
+
+                    // O nome chegou quando o campo passa a mostrar "código – nome do exame"
+                    const nomeChegou = cod => {
+                        const el = campoCodigo();
+                        if (!el) return false;
+                        const v = (el.value || '').trim();
+                        return v.length > cod.length + 3 && /[A-Za-zÀ-ÿ]/.test(v);
+                    };
+
                     for (var i = 0; i < l.length; i++) {
-                        var item = l[i];
-                        var c = item.cod;
-                        var q = item.qtd;
-                        
-                        var seletorInputAmil = '#inclusao-consulta-pedido > section > as-tipo-pedido-sadt > div.procedimentos-servicos.card-config > as-procedimento-servico > div > ul > li > as-procedimento-autocomplete > div > div > input';
-                        
-                        let nomeEncontrado = false;
-                        let tentativasDeReinsercao = 0;
-                        // Teto de tentativas: sem isto, se o nome do exame nunca voltasse
-                        // o robô ficava tentando o mesmo código para sempre e travava a aba.
-                        while (!nomeEncontrado && tentativasDeReinsercao < 4) {
-                            var inp = document.querySelector(seletorInputAmil);
-                            if (!inp) { inp = document.querySelector('#inclusao-consulta-pedido input[type="text"]'); }
-                            if (!inp) { alert('ERRO: Campo INPUT não encontrado!'); break; }
-                            log.innerText = 'Processando: ' + c + ' (' + (i + 1) + '/' + l.length + ')' + (q > 1 ? ' Qtd: ' + q : '') + (tentativasDeReinsercao > 0 ? ` [Re-tentativa: ${tentativasDeReinsercao}]` : '');
-                            inp.focus();
-                            inp.value = '';
-                            inp.dispatchEvent(new Event('input', { bubbles: true }));
-                            await new Promise(r => setTimeout(r, 100));
-                            inp.value = c;
-                            inp.dispatchEvent(new Event('input', { bubbles: true }));
-                            inp.dispatchEvent(new Event('change', { bubbles: true }));
-                            var enterEvent = { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13, which: 13, charCode: 13, view: window };
-                            inp.dispatchEvent(new KeyboardEvent('keydown', enterEvent));
-                            inp.dispatchEvent(new KeyboardEvent('keypress', enterEvent));
-                            inp.dispatchEvent(new KeyboardEvent('keyup', enterEvent));
-                            log.innerText = 'Aguardando o sistema preencher o nome do exame...';
-                            await new Promise(resolve => {
-                                let tentativasEspera = 0;
-                                let check = setInterval(() => {
-                                    let campoAtual = document.querySelector(seletorInputAmil) || document.querySelector('#inclusao-consulta-pedido input[type="text"]');
-                                    
-                                    if (campoAtual && campoAtual.value && campoAtual.value !== c && campoAtual.value.length > c.length) {
-                                        clearInterval(check);
-                                        nomeEncontrado = true;
-                                        resolve();
-                                    } else {
-                                        tentativasEspera++;
-                                        if (tentativasEspera > 100) {
-                                             clearInterval(check);
-                                            resolve();
-                                         }
-                                    }
-                                }, 50);
-                            });
-                            if (!nomeEncontrado) {
-                                // O portal não preencheu sozinho: procuro o exame na lista
-                                // de sugestões e escolho ele. Sem isso o botão "Incluir
-                                // procedimento" fica bloqueado e o lote para.
-                                let sug = Array.from(document.querySelectorAll(
-                                    'li,[role="option"],.mat-option,.dropdown-item,.autocomplete-item,as-procedimento-autocomplete li,as-procedimento-autocomplete div'))
-                                    .filter(o => {
-                                        const r = o.getBoundingClientRect();
-                                        return r.width > 0 && r.height > 0;
-                                    });
-                                let alvo = sug.find(o => (o.innerText || o.textContent || '').includes(c))
-                                        || sug.find(o => ((o.innerText || o.textContent || '').trim().length > c.length + 3));
+                        var item = l[i], c = item.cod, q = item.qtd;
+                        let pronto = false;
+
+                        for (let tent = 0; tent < 3 && !pronto; tent++) {
+                            log.innerText = 'Processando ' + c + ' (' + (i + 1) + '/' + l.length + ')' +
+                                (q > 1 ? ' Qtd: ' + q : '') + (tent ? ' — tentativa ' + (tent + 1) : '');
+                            let inp = campoCodigo();
+                            if (!inp) { log.innerText = 'ERRO: campo do procedimento não encontrado!'; break; }
+
+                            escrever(inp, '');
+                            await wait(250);
+                            escrever(inp, c);
+
+                            // ── PASSO 1: esperar o portal responder ──
+                            // Antes o robô apertava Enter na hora, no vazio, e o nome
+                            // nunca vinha. Agora espera o nome aparecer OU a lista abrir.
+                            log.innerText = 'Aguardando o nome do exame de ' + c + '...';
+                            let temLista = false;
+                            for (let w = 0; w < 60; w++) {          // até 12 segundos
+                                if (nomeChegou(c)) { pronto = true; break; }
+                                if (opcoes().length) { temLista = true; break; }
+                                await wait(200);
+                            }
+
+                            // Se abriu lista, escolho o exame deste código
+                            if (!pronto && temLista) {
+                                const lst = opcoes();
+                                const alvo = lst.find(o => (o.innerText || o.textContent || '').includes(c)) || lst[0];
                                 if (alvo) {
-                                    log.innerText = 'Escolhendo o exame na lista...';
+                                    log.innerText = 'Escolhendo o exame de ' + c + '...';
                                     try { alvo.scrollIntoView({ block: 'center' }); } catch (e) { }
-                                    ['mousemove','mouseover','mousedown','mouseup','click'].forEach(ev =>
-                                        alvo.dispatchEvent(new MouseEvent(ev, { bubbles: true })));
-                                    await new Promise(r => setTimeout(r, 400));
-                                    let dep = document.querySelector(seletorInputAmil) || document.querySelector('#inclusao-consulta-pedido input[type="text"]');
-                                    if (dep && dep.value && dep.value !== c) nomeEncontrado = true;
+                                    ['mousemove', 'mouseover', 'mousedown', 'mouseup', 'click']
+                                        .forEach(ev => alvo.dispatchEvent(new MouseEvent(ev, { bubbles: true })));
+                                }
+                                for (let w = 0; w < 30; w++) {
+                                    if (nomeChegou(c)) { pronto = true; break; }
+                                    if (w === 4) {   // o clique não pegou: Enter, com a opção já destacada
+                                        const el = campoCodigo();
+                                        if (el) {
+                                            const ev = { bubbles: true, cancelable: true, key: 'Enter', code: 'Enter', keyCode: 13, which: 13, charCode: 13, view: window };
+                                            el.dispatchEvent(new KeyboardEvent('keydown', ev));
+                                            el.dispatchEvent(new KeyboardEvent('keypress', ev));
+                                            el.dispatchEvent(new KeyboardEvent('keyup', ev));
+                                        }
+                                    }
+                                    await wait(200);
                                 }
                             }
-                            if (!nomeEncontrado) {
-                                tentativasDeReinsercao++;
-                                log.innerText = `Limpando e re-inserindo código ${c}...`;
-                                await new Promise(r => setTimeout(r, 500)); 
-                            }
+                            if (!pronto) await wait(500);
                         }
-                        
-                        if (!nomeEncontrado) {
-                            // O nome não veio: não salvo nada, senão entraria o exame errado.
-                            log.innerText = '⚠️ ' + c + ' não carregou — pulei este código.';
-                            await new Promise(r => setTimeout(r, 400));
+
+                        if (!pronto) {
+                            log.innerText = '⚠️ ' + c + ': o nome não carregou — pulei este código.';
+                            await wait(700);
                             continue;
                         }
-                        log.innerText = 'Nome carregado! Processando: ' + c + ' (' + (i + 1) + '/' + l.length + ')' + (q > 1 ? ' Qtd: ' + q : '');
-                        
-                        // Quantidade SEMPRE, mesmo sendo 1: o portal deixa o botão
-                        // "Incluir procedimento" bloqueado enquanto o campo está vazio.
-                        var qInp = document.querySelector('#quantidade-procedimento');
-                        if (!qInp) {
-                            // reserva: campo de quantidade ao lado do campo do código
-                            var todos = Array.from(document.querySelectorAll('#inclusao-consulta-pedido input'))
-                                .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && !e.disabled && !e.readOnly; });
-                            var iCod = todos.findIndex(e => (e.value || '').indexOf(c) === 0 || e === document.querySelector(seletorInputAmil));
-                            if (iCod >= 0 && todos[iCod + 1]) qInp = todos[iCod + 1];
+
+                        // ── PASSO 2: quantidade (sempre, mesmo sendo 1) ──
+                        const qi = campoQtd();
+                        if (qi) {
+                            escrever(qi, String(q));
+                            try { qi.blur(); } catch (e) { }
+                            qi.dispatchEvent(new Event('blur', { bubbles: true }));
+                            await wait(300);
                         }
-                        if (qInp) {
-                            qInp.focus();
-                            var setQA = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-                            try { setQA.call(qInp, String(q)); } catch (e) { qInp.value = q; }
-                            qInp.dispatchEvent(new Event('input', { bubbles: true }));
-                            qInp.dispatchEvent(new Event('change', { bubbles: true }));
-                            qInp.blur();
-                            qInp.dispatchEvent(new Event('blur', { bubbles: true }));
-                            await new Promise(r => setTimeout(r, 200));
+
+                        // ── PASSO 3: incluir procedimento ──
+                        log.innerText = 'Incluindo ' + c + ' (' + (i + 1) + '/' + l.length + ')...';
+                        let bt = botaoIncluir();
+                        for (let w = 0; w < 30 && (!bt || bt.disabled); w++) { await wait(200); bt = botaoIncluir(); }
+                        if (bt && !bt.disabled) {
+                            bt.click();
+                            // espera o portal confirmar (o campo do código esvazia)
+                            for (let w = 0; w < 40; w++) {
+                                const el = campoCodigo();
+                                if (!el || !(el.value || '').trim()) break;
+                                await wait(200);
+                            }
+                        } else {
+                            log.innerText = '⚠️ O botão "Incluir procedimento" não liberou para ' + c;
+                            await wait(700);
                         }
-                        
-                        var btn = document.querySelector('#inclusao-consulta-pedido > section > as-tipo-pedido-sadt > div.procedimentos-servicos.card-config > as-procedimento-servico > div > div > button');
-                        if (!btn || btn.disabled) {
-                            // reserva: acha pelo texto "Incluir procedimento"
-                            var alt = Array.from(document.querySelectorAll('button'))
-                                .find(x => /incluir\s+procedimento/i.test(x.textContent || '')
-                                        && !x.disabled && x.getBoundingClientRect().width > 0);
-                            if (alt) btn = alt;
-                        }
-                        if (btn && btn.disabled) {
-                            // ainda bloqueado: dou um instante para o portal liberar
-                            for (var wB = 0; wB < 20 && btn.disabled; wB++) await new Promise(r => setTimeout(r, 150));
-                        }
-                        if (btn) { btn.click(); } else { log.innerText = 'Botão incluir não apareceu para ' + c; }
-                        await new Promise(r => setTimeout(r, 400));
+                        await wait(300);
                     }
-                    
+
+                    log.innerText = '✅ Finalizado!';
                     document.getElementById('bi').disabled = false;
                     alert('Finalizado!');
                 };
