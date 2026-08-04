@@ -1438,6 +1438,28 @@
                                 }, 50);
                             });
                             if (!nomeEncontrado) {
+                                // O portal não preencheu sozinho: procuro o exame na lista
+                                // de sugestões e escolho ele. Sem isso o botão "Incluir
+                                // procedimento" fica bloqueado e o lote para.
+                                let sug = Array.from(document.querySelectorAll(
+                                    'li,[role="option"],.mat-option,.dropdown-item,.autocomplete-item,as-procedimento-autocomplete li,as-procedimento-autocomplete div'))
+                                    .filter(o => {
+                                        const r = o.getBoundingClientRect();
+                                        return r.width > 0 && r.height > 0;
+                                    });
+                                let alvo = sug.find(o => (o.innerText || o.textContent || '').includes(c))
+                                        || sug.find(o => ((o.innerText || o.textContent || '').trim().length > c.length + 3));
+                                if (alvo) {
+                                    log.innerText = 'Escolhendo o exame na lista...';
+                                    try { alvo.scrollIntoView({ block: 'center' }); } catch (e) { }
+                                    ['mousemove','mouseover','mousedown','mouseup','click'].forEach(ev =>
+                                        alvo.dispatchEvent(new MouseEvent(ev, { bubbles: true })));
+                                    await new Promise(r => setTimeout(r, 400));
+                                    let dep = document.querySelector(seletorInputAmil) || document.querySelector('#inclusao-consulta-pedido input[type="text"]');
+                                    if (dep && dep.value && dep.value !== c) nomeEncontrado = true;
+                                }
+                            }
+                            if (!nomeEncontrado) {
                                 tentativasDeReinsercao++;
                                 log.innerText = `Limpando e re-inserindo código ${c}...`;
                                 await new Promise(r => setTimeout(r, 500)); 
@@ -1452,19 +1474,40 @@
                         }
                         log.innerText = 'Nome carregado! Processando: ' + c + ' (' + (i + 1) + '/' + l.length + ')' + (q > 1 ? ' Qtd: ' + q : '');
                         
-                        if (q > 1) {
-                            var qInp = document.querySelector('#quantidade-procedimento');
-                            if (qInp) {
-                                qInp.focus();
-                                qInp.value = q;
-                                qInp.dispatchEvent(new Event('input', { bubbles: true }));
-                                qInp.dispatchEvent(new Event('change', { bubbles: true }));
-                                await new Promise(r => setTimeout(r, 100));
-                            }
+                        // Quantidade SEMPRE, mesmo sendo 1: o portal deixa o botão
+                        // "Incluir procedimento" bloqueado enquanto o campo está vazio.
+                        var qInp = document.querySelector('#quantidade-procedimento');
+                        if (!qInp) {
+                            // reserva: campo de quantidade ao lado do campo do código
+                            var todos = Array.from(document.querySelectorAll('#inclusao-consulta-pedido input'))
+                                .filter(e => { const r = e.getBoundingClientRect(); return r.width > 0 && !e.disabled && !e.readOnly; });
+                            var iCod = todos.findIndex(e => (e.value || '').indexOf(c) === 0 || e === document.querySelector(seletorInputAmil));
+                            if (iCod >= 0 && todos[iCod + 1]) qInp = todos[iCod + 1];
+                        }
+                        if (qInp) {
+                            qInp.focus();
+                            var setQA = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+                            try { setQA.call(qInp, String(q)); } catch (e) { qInp.value = q; }
+                            qInp.dispatchEvent(new Event('input', { bubbles: true }));
+                            qInp.dispatchEvent(new Event('change', { bubbles: true }));
+                            qInp.blur();
+                            qInp.dispatchEvent(new Event('blur', { bubbles: true }));
+                            await new Promise(r => setTimeout(r, 200));
                         }
                         
                         var btn = document.querySelector('#inclusao-consulta-pedido > section > as-tipo-pedido-sadt > div.procedimentos-servicos.card-config > as-procedimento-servico > div > div > button');
-                        if (btn) { btn.click(); } else { log.innerText = 'Botão salvar não apareceu para ' + c; }
+                        if (!btn || btn.disabled) {
+                            // reserva: acha pelo texto "Incluir procedimento"
+                            var alt = Array.from(document.querySelectorAll('button'))
+                                .find(x => /incluir\s+procedimento/i.test(x.textContent || '')
+                                        && !x.disabled && x.getBoundingClientRect().width > 0);
+                            if (alt) btn = alt;
+                        }
+                        if (btn && btn.disabled) {
+                            // ainda bloqueado: dou um instante para o portal liberar
+                            for (var wB = 0; wB < 20 && btn.disabled; wB++) await new Promise(r => setTimeout(r, 150));
+                        }
+                        if (btn) { btn.click(); } else { log.innerText = 'Botão incluir não apareceu para ' + c; }
                         await new Promise(r => setTimeout(r, 400));
                     }
                     
@@ -2283,6 +2326,163 @@
                 setTimeout(()=>painel.remove(),3000);
             })();
         },
+        "PROASA/CNU": () => {
+            (function () {
+                if (window._sawGatilho) {
+                    alert("O robô já está armado, na posição " + (window._sawState.index + 1) +
+                          " de " + window._sawState.codigos.length + ". Abra a janela de autorização.");
+                    return;
+                }
+                var txt = prompt("Cole os códigos:");
+                if (!txt) return;
+                var m = txt.match(/\b\d{8}\b/g);
+                if (!m) return alert("Nenhum código válido!");
+                var counts = {};
+                m.forEach(x => counts[x] = (counts[x] || 0) + 1);
+                var codigos = [...new Set(m)];
+                window._sawState = { codigos: codigos, counts: counts, index: 0 };
+                window._sawGatilho = true;
+
+                // Coloca o botão "COLAR CÓDIGOS" dentro da janela de autorização
+                var armarBotao = function (winAlvo) {
+                    if (!winAlvo) return;
+                    var checkLoad = setInterval(function () {
+                        try {
+                            var doc = winAlvo.document;
+                            if (doc && doc.readyState === 'complete' &&
+                                doc.querySelector("[id*='procedimentosSolicitados']") &&
+                                !doc.getElementById('btn-robo-saw')) {
+                                clearInterval(checkLoad);
+                                var b = doc.createElement('button');
+                                b.id = 'btn-robo-saw';
+                                var teto = Math.min(window._sawState.index + 30, window._sawState.codigos.length);
+                                b.innerText = '🤖 COLAR CÓDIGOS (' + (window._sawState.index + 1) + ' a ' + teto + ')';
+                                b.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999999;padding:15px 20px;background:#e67e22;color:#fff;border:3px solid #d35400;border-radius:8px;font-weight:bold;cursor:pointer;box-shadow:0 5px 15px rgba(0,0,0,0.5);font-family:Arial;font-size:14px;transition:0.2s';
+                                b.onclick = async function () {
+                                    b.innerText = '🔥 Preenchendo...';
+                                    b.style.background = '#c0392b';
+                                    b.disabled = true;
+                                    var k = 0;
+                                    var wait = ms => new Promise(r => setTimeout(r, ms));
+                                    while (k < 30 && window._sawState.index < window._sawState.codigos.length) {
+                                        var currCode = window._sawState.codigos[window._sawState.index];
+                                        var currQtd = window._sawState.counts[currCode];
+                                        var idBase = '#procedimentosSolicitados\\[' + k + '\\]\\.';
+                                        if (k >= 5) {
+                                            var tentou = 0;
+                                            while (!doc.querySelector(idBase + 'tipo') && tentou < 3) {
+                                                var btnAdd = doc.querySelector('#qata-adicionar');
+                                                if (btnAdd) {
+                                                    btnAdd.click();
+                                                    for (var over = 0; over < 150; over++) {
+                                                        var blk = doc.querySelector('.blockUI, .loading, .overlay, [class*="aguarde"], .modal-backdrop');
+                                                        if (!blk || blk.offsetParent === null) break;
+                                                        await wait(1);
+                                                    }
+                                                    for (var wL = 0; wL < 50; wL++) {
+                                                        if (doc.querySelector(idBase + 'tipo')) break;
+                                                        await wait(1);
+                                                    }
+                                                }
+                                                tentou++;
+                                            }
+                                        }
+                                        var tab = doc.querySelector(idBase + 'tipo');
+                                        if (!tab) {
+                                            b.innerText = '⚠️ Travou no ' + currCode + '.';
+                                            b.style.background = '#f39c12';
+                                            b.disabled = false;
+                                            return;
+                                        }
+                                        if (tab.tagName === 'SELECT') {
+                                            Array.from(tab.options).forEach(o => {
+                                                if (o.text.toUpperCase().includes('TUSS') || o.text.includes('22 - Procedimentos')) tab.value = o.value;
+                                            });
+                                            tab.dispatchEvent(new Event('change', { bubbles: true }));
+                                        } else {
+                                            tab.click();
+                                            await wait(1);
+                                            var xp = doc.evaluate("//*[contains(text(), 'TUSS') or contains(text(), '22 - Procedimentos') or contains(text(), '22-Procedimentos')]", doc, null, 9, null);
+                                            for (var j = 0; j < xp.snapshotLength; j++) {
+                                                var n = xp.snapshotItem(j);
+                                                if (n.offsetParent !== null && n.innerText.length < 60) {
+                                                    n.click();
+                                                    break;
+                                                }
+                                            }
+                                        }
+                                        var inp = doc.querySelector(idBase + 'codigo');
+                                        if (inp) {
+                                            inp.value = currCode;
+                                            inp.dispatchEvent(new Event('input', { bubbles: true }));
+                                            inp.dispatchEvent(new Event('change', { bubbles: true }));
+                                        }
+                                        var qtd = doc.querySelector(idBase + 'quantidade');
+                                        if (qtd) {
+                                            qtd.value = currQtd;
+                                            qtd.dispatchEvent(new Event('input', { bubbles: true }));
+                                            qtd.dispatchEvent(new Event('change', { bubbles: true }));
+                                        }
+                                        var desc = doc.querySelector(idBase + 'descricao');
+                                        if (desc) {
+                                            desc.click();
+                                            desc.focus();
+                                            desc.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
+                                        }
+                                        k++;
+                                        window._sawState.index++;
+                                        await wait(1);
+                                    }
+                                    if (window._sawState.index < window._sawState.codigos.length) {
+                                        b.innerText = '✅ 30 INSERIDOS! Salve e abra nova guia.';
+                                        b.style.background = '#8e44ad';
+                                    } else {
+                                        b.innerText = '✅ TUDO FINALIZADO!';
+                                        b.style.background = '#27ae60';
+                                        window._sawGatilho = false;
+                                    }
+                                    setTimeout(() => b.remove(), 7000);
+                                };
+                                doc.body.appendChild(b);
+                            }
+                        } catch (err) { }
+                    }, 1000);
+                };
+
+                // Pega a janela de autorização quando o portal abrir
+                if (!window._sawOpenHooked) {
+                    var origOpen = window.open;
+                    window.open = function () {
+                        var winAlvo = origOpen.apply(this, arguments);
+                        if (winAlvo && window._sawGatilho) armarBotao(winAlvo);
+                        return winAlvo;
+                    };
+                    window._sawOpenHooked = true;
+                }
+                window._sawArmar = armarBotao;
+
+                // Links com target="_blank" não passam pelo window.open: interceptamos o clique
+                if (!window._sawListenerAdded) {
+                    document.addEventListener('click', function (e) {
+                        var a = e.target.closest && e.target.closest('a');
+                        if (a && a.target === '_blank' && window._sawGatilho) {
+                            e.preventDefault();
+                            window.open(a.href);
+                        }
+                    }, true);
+                    window._sawListenerAdded = true;
+                }
+
+                // Se a janela de autorização já estiver aberta, arma nela também
+                try {
+                    (window.__crJanelas || []).forEach(function (w) {
+                        try { if (w && !w.closed) armarBotao(w); } catch (e) { }
+                    });
+                } catch (e) { }
+
+                alert("Robô armado! Agora abra (ou volte para) a janela de autorização e clique no botão laranja \"COLAR CÓDIGOS\" que aparece no canto dela.");
+            })();
+        },
         "AFFEGO": () => {
             (async function () {
                 var l = prompt("Cole os códigos de 8 dígitos aqui:");
@@ -2392,6 +2592,7 @@
         "CNU UNIMED":       { icone: "🧬", cor: "#00995d", desc: "Automação para Autorizações CNU Unimed",     modo: "janela" },
         "AFFEGO":           { icone: "🛠️", cor: "#378ADD", desc: "Automação para Fisco e Convênios Affego",        modo: "prompt" },
         "ASSEFAZ":          { icone: "🏛️", cor: "#1a4f8a", desc: "Automação para Convênios Assefaz",              modo: "prompt" },
+        "PROASA/CNU":       { icone: "🧬", cor: "#00995d", desc: "Automação para Autorizações CNU Unimed",       modo: "prompt" },
         "AMIL":             { icone: "🩺", cor: "#2ecc71", desc: "Automação para Rede Credenciada Amil",           modo: "painel", txt: "tc",            btn: "bi" },
         "INAS":             { icone: "🤝", cor: "#d9a520", desc: "Automação para Convênios Inas GDF",              modo: "painel", txt: "g-codes",       btn: "g-start" },
         "MEDSENIOR/UN SEG": { icone: "🏥", cor: "#27ae60", desc: "Automação para Planos de Saúde",                 modo: "painel", txt: "txtInput",      btn: "btnRun" },
@@ -2454,14 +2655,18 @@
             const promptOriginal = window.prompt;
             const openOriginal = window.open;
             window.prompt = () => texto;
-            window.open = function () {
+            const nossoOpen = function () {
                 const w = openOriginal.apply(window, arguments);
                 if (w) janelasRobo.push(w);
                 return w;
             };
+            window.open = nossoOpen;
             try { func(); } finally {
                 window.prompt = promptOriginal;
-                window.open = openOriginal;
+                // Só devolvo o window.open se ainda for o meu. Alguns robôs
+                // (Unimed/Proasa) instalam o próprio gatilho aqui — se eu
+                // restaurasse por cima, o botão nunca apareceria na janela.
+                if (window.open === nossoOpen) window.open = openOriginal;
             }
             return;
         }
@@ -2624,10 +2829,7 @@
             ctx.timer(t);
         },
 
-        // DESATIVADO: a versão de moldura errava o campo "Item de custo".
-        // Com este nome o app não a encontra e usa o robô TRF original,
-        // que tem a correção automática desse campo e funciona.
-        "TRF_DESATIVADO_USA_O_ORIGINAL": (texto, ctx) => {
+        "TRF": (texto, ctx) => {
             var cods = texto.match(/\b\d{8}\b/g);
             if (!cods) { alert("Nenhum código!"); ctx.fim(); return; }
             var counts = {};
@@ -2644,6 +2846,39 @@
             var selErro = "#tsk_toolbar";
             var idx = 0;
 
+            // Acha os botões pelo TEXTO, não pela posição. Antes o robô contava
+            // a posição na tela e no último código clicava no botão errado —
+            // por isso o último exame ficava sem salvar.
+            var textoDe = e => ((e.innerText || e.textContent || e.value || '') + '')
+                .replace(/\s+/g, ' ').trim().toLowerCase();
+            var acharBotao = function (d, qual) {
+                try {
+                    var cand = Array.from(d.querySelectorAll('a,button,input[type=button],input[type=submit],nobr'));
+                    if (qual === 'novo') {
+                        return cand.find(e => /^salvar\s*\/\s*novo$/.test(textoDe(e)))
+                            || cand.find(e => textoDe(e).indexOf('salvar') === 0 && textoDe(e).indexOf('novo') > -1)
+                            || d.querySelector(selBtnSalvar);
+                    }
+                    return cand.find(e => textoDe(e) === 'salvar')
+                        || cand.find(e => textoDe(e).indexOf('salvar') === 0 && textoDe(e).indexOf('novo') === -1)
+                        || d.querySelector(selBtnFinalizar);
+                } catch (e) { return null; }
+            };
+            // Se o alvo for um <nobr> dentro do link, clica no link
+            var clicar = function (el) {
+                if (!el) return false;
+                var alvo = (el.tagName === 'NOBR' && el.closest('a')) ? el.closest('a') : el;
+                try { alvo.click(); return true; } catch (e) { return false; }
+            };
+            // O portal reclama de duas formas: no rodapé ("Verifique...") e ao lado
+            // do campo Item de custo ("Registro não encontrado").
+            var temErro = function (d) {
+                try {
+                    var t = d.body ? (d.body.innerText || d.body.textContent || '') : '';
+                    return /verifique\s+mensagens|registro\s+n[ãa]o\s+encontrado/i.test(t);
+                } catch (e) { return false; }
+            };
+
             function proximoPasso() {
                 if (!ctx.ativo()) return;
                 if (idx >= lista.length) {
@@ -2657,8 +2892,8 @@
                     var erro = doc.querySelector(selErro);
                     var ehUltimo = (idx === lista.length - 1);
 
-                    if (erro && erro.innerText.includes("Verifique")) {
-                        ctx.status("⚠️ Corrigindo erro no " + lista[idx]);
+                    if ((erro && erro.innerText.includes("Verifique")) || temErro(doc)) {
+                        ctx.status("⚠️ Corrigindo o Item de custo do " + lista[idx] + " (trocando para \"Exame\")");
                         var f = doc.querySelector(selFrase);
                         if (f) {
                             f.value = "Exame";
@@ -2668,8 +2903,8 @@
                             setTimeout(function () {
                                 if (!ctx.ativo()) return;
                                 var d2 = ctx.doc();
-                                var btn = ehUltimo ? d2.querySelector(selBtnFinalizar) : d2.querySelector(selBtnSalvar);
-                                if (btn) btn.click();
+                                var btn = ehUltimo ? acharBotao(d2, 'salvar') : acharBotao(d2, 'novo');
+                                clicar(btn);
                                 var checarVazio = setInterval(function () {
                                     if (!ctx.ativo()) { clearInterval(checarVazio); return; }
                                     try {
@@ -2725,20 +2960,23 @@
                     setTimeout(function () {
                         if (!ctx.ativo()) return;
                         var d2 = ctx.doc();
-                        var btn = ehUltimo ? d2.querySelector(selBtnFinalizar) : d2.querySelector(selBtnSalvar);
-                        if (btn) btn.click();
+                        var btn = ehUltimo ? acharBotao(d2, 'salvar') : acharBotao(d2, 'novo');
+                        clicar(btn);
                         var checarVazio = setInterval(function () {
                             if (!ctx.ativo()) { clearInterval(checarVazio); return; }
                             try {
                                 var docAtual = ctx.doc();
                                 var erroAtual = docAtual.querySelector(selErro);
-                                if (erroAtual && erroAtual.innerText.includes("Verifique")) {
+                                if ((erroAtual && erroAtual.innerText.includes("Verifique")) || temErro(docAtual)) {
                                     clearInterval(checarVazio);
                                     setTimeout(proximoPasso, 300);
                                     return;
                                 }
                                 var inpAtual = docAtual.querySelector(selCod);
-                                if (ehUltimo || (inpAtual && inpAtual.value === "")) {
+                                // No último código, esperamos o formulário sumir ou limpar —
+                                // é o sinal de que o registro foi mesmo salvo.
+                                var salvouUltimo = ehUltimo && (!inpAtual || inpAtual.value === "");
+                                if (salvouUltimo || (!ehUltimo && inpAtual && inpAtual.value === "")) {
                                     clearInterval(checarVazio);
                                     idx++;
                                     setTimeout(proximoPasso, 300);
@@ -2930,7 +3168,9 @@
     // ── ROBÔ QUE PILOTA UMA JANELA SEPARADA (CNU Unimed) ──────────
     const roboJanela = {
 
-        "CNU UNIMED": (texto, ctx) => {
+        // DESATIVADO: substituído pelo robô "PROASA/CNU", que põe o botão
+        // "COLAR CÓDIGOS" dentro da própria janela de autorização.
+        "CNU_UNIMED_DESATIVADO": (texto, ctx) => {
             const LIMITE = 30;
 
             // Códigos repetidos não viram linhas novas: viram quantidade
@@ -3908,7 +4148,7 @@
         { rotulo: "Amil",              chave: "AMIL",             icone: "🩺", cor: "#2ecc71", desc: "Automação para Rede Credenciada Amil" },
         { rotulo: "Assefaz",           chave: "ASSEFAZ",          icone: "🏛️", cor: "#1a4f8a", desc: "Automação para Convênios Assefaz" },
         { rotulo: "BRB Saúde",         chave: "ASSEFAZ",          icone: "🏦", cor: "#2b6cb0", desc: "Automação para Convênios BRB Saúde" },
-        { rotulo: "CNU Unimed",        chave: "CNU UNIMED",       icone: "🧬", cor: "#00995d", desc: "Automação para Autorizações CNU Unimed" },
+        { rotulo: "CNU Unimed",        chave: "PROASA/CNU",       icone: "🧬", cor: "#00995d", desc: "Automação para Autorizações CNU Unimed" },
         { rotulo: "Fascal",            chave: "ASSEFAZ",          icone: "🔷", cor: "#d4a017", desc: "Automação para Convênios Fascal" },
         { rotulo: "Inas GDF",          chave: "INAS",             icone: "🤝", cor: "#d9a520", desc: "Automação para Convênios Inas GDF" },
         { rotulo: "Medsenior",         chave: "MEDSENIOR/UN SEG", icone: "🏥", cor: "#27ae60", desc: "Automação para Convênio Medsenior" },
@@ -3917,7 +4157,7 @@
         { rotulo: "Plenum",            chave: "PLENUM",           icone: "⚖️", cor: "#8e44ad", desc: "Automação para Convênios de Advocacia e Justiça" },
         { rotulo: "PM",                chave: "PM/STJ",           icone: "🛡️", cor: "#5dade2", desc: "Automação para Polícia Militar" },
         { rotulo: "Postal (Correios)", chave: "POSTAL",           icone: "✉️", cor: "#d4ac0d", desc: "Automação para Logística Postal" },
-        { rotulo: "Proasa",            chave: "CNU UNIMED",       icone: "🧪", cor: "#2e86c1", desc: "Automação para Autorizações Proasa" },
+        { rotulo: "Proasa",            chave: "PROASA/CNU",       icone: "🧪", cor: "#2e86c1", desc: "Automação para Autorizações Proasa" },
         { rotulo: "Serpro",            chave: "ASSEFAZ",          icone: "💻", cor: "#1f3fa8", desc: "Automação para Convênios Serpro" },
         { rotulo: "STJ",               chave: "PM/STJ",           icone: "🏛️", cor: "#4a90d9", desc: "Automação para Superior Tribunal de Justiça" },
         { rotulo: "Sul America",       chave: "SULAMERICA",       icone: "🌎", cor: "#e74c3c", desc: "Automação para Convênios SulAmérica" },
