@@ -2655,7 +2655,7 @@
         "AFFEGO":           { icone: "🛠️", cor: "#378ADD", desc: "Automação para Fisco e Convênios Affego",        modo: "prompt" },
         "ASSEFAZ":          { icone: "🏛️", cor: "#1a4f8a", desc: "Automação para Convênios Assefaz",              modo: "prompt" },
         "PROASA/CNU":       { icone: "🧬", cor: "#00995d", desc: "Automação para Autorizações CNU Unimed",       modo: "prompt" },
-        "AMIL":             { icone: "🩺", cor: "#2ecc71", desc: "Automação para Rede Credenciada Amil",           modo: "painel", txt: "tc",            btn: "bi" },
+        "AMIL":             { icone: "🩺", cor: "#2ecc71", desc: "Automação para Rede Credenciada Amil",           modo: "painel", txt: "tc",            btn: "bi", semMotor: true, mostrarPainel: true },
         "INAS":             { icone: "🤝", cor: "#d9a520", desc: "Automação para Convênios Inas GDF",              modo: "painel", txt: "g-codes",       btn: "g-start" },
         "MEDSENIOR/UN SEG": { icone: "🏥", cor: "#27ae60", desc: "Automação para Planos de Saúde",                 modo: "painel", txt: "txtInput",      btn: "btnRun" },
         "PLANASSISTE MPU":  { icone: "📝", cor: "#2d7dff", desc: "Automação para Planilhas do MPU",                modo: "painel", txt: "rc",            btn: "rb" },
@@ -3660,12 +3660,26 @@
         iniciarGiro();
     };
 
-    const ligarMotorFundo = () => {
+    const ligarMotorFundo = (modoLeve) => {
         if (motor.ligado) return;
         motor.diag = [];
         const temSom = ligarSom();
-        const temRelogio = temSom ? ligarRelogioSom() : false;
         const temRtc = ligarConexaoViva();
+
+        // MODO LEVE: mantém a aba acordada, mas NÃO toma o relógio da página.
+        // Portais feitos em Angular (o do Amil, por exemplo) dependem do
+        // relógio deles para saber que a busca terminou e redesenhar a tela.
+        // Se a gente toma o relógio, o portal fica preso em "Buscando".
+        if (modoLeve) {
+            motor.diag.push('modo leve (portal sensível) ✅');
+            motor.diag.push(temSom ? 'aba acordada ✅' : 'aba acordada ❌');
+            motor.diag.push(temRtc ? 'conexão viva ✅' : 'conexão viva ❌');
+            motor.ligado = true;
+            motor.originais = null;
+            return;
+        }
+
+        const temRelogio = temSom ? ligarRelogioSom() : false;
         motor.diag.push(temRelogio ? 'relógio da placa de som ✅' : 'relógio da placa de som ❌ → reforço ativo');
         motor.diag.push(temSom ? 'aba acordada ✅' : 'aba acordada ❌');
         motor.diag.push(temRtc ? 'conexão viva ✅' : 'conexão viva ❌');
@@ -3721,8 +3735,8 @@
     };
 
     const desligarMotorFundo = () => {
-        try { motor.originais && motor.originais.ciO.call(window, motor.backup); } catch (e) { }
-        try { motor.originais && motor.originais.ciO.call(window, motor.guarda); } catch (e) { }
+        try { if (motor.originais) motor.originais.ciO.call(window, motor.backup); } catch (e) { }
+        try { if (motor.originais) motor.originais.ciO.call(window, motor.guarda); } catch (e) { }
         motor.backup = null; motor.guarda = null;
         desligarRelogioSom();
         desligarSom();
@@ -3771,6 +3785,8 @@
     const ehPainelDoRobo = (el, nome) => {
         try {
             const inf = infoRobos[nome] || {};
+            // Alguns robôs mostram a contagem no painel deles — deixamos à vista
+            if (inf.mostrarPainel) return false;
             const ids = [inf.txt, inf.btn, statusRobo[nome], contadorRobo[nome]].filter(Boolean);
             for (const id of ids) {
                 if (el.id === id) return true;
@@ -4050,7 +4066,8 @@
         janelasRobo = [];
         ultimoAviso = '';
         modoParar();
-        try { ligarMotorFundo(); } catch (e) { console.log('motor de fundo indisponível:', e.message); }
+        const infoAtual = infoRobos[nome] || {};
+        try { ligarMotorFundo(!!infoAtual.semMotor); } catch (e) { console.log('motor de fundo indisponível:', e.message); }
         try { silenciarAvisos(); } catch (e) { console.log('aviso:', e.message); }
         mostrarStatus('▶ Iniciando... pode minimizar ou trocar de aba.\n⚙️ ' + motor.diag.join(' · '), '#4dc3ff');
 
