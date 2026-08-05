@@ -2358,125 +2358,235 @@
                 window._sawState = { codigos: codigos, counts: counts, index: 0 };
                 window._sawGatilho = true;
 
-                // Coloca o botão "COLAR CÓDIGOS" dentro da janela de autorização
+                // Põe o botão "COLAR CÓDIGOS" dentro da janela de autorização
                 var armarBotao = function (winAlvo) {
                     if (!winAlvo) return;
                     var checkLoad = setInterval(function () {
                         try {
                             var doc = winAlvo.document;
-                            if (doc && doc.readyState === 'complete' &&
-                                doc.querySelector("[id*='procedimentosSolicitados']") &&
-                                !doc.getElementById('btn-robo-saw')) {
-                                clearInterval(checkLoad);
-                                var b = doc.createElement('button');
-                                b.id = 'btn-robo-saw';
-                                var teto = Math.min(window._sawState.index + 30, window._sawState.codigos.length);
-                                b.innerText = '🤖 COLAR CÓDIGOS (' + (window._sawState.index + 1) + ' a ' + teto + ')';
-                                b.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999999;padding:15px 20px;background:#e67e22;color:#fff;border:3px solid #d35400;border-radius:8px;font-weight:bold;cursor:pointer;box-shadow:0 5px 15px rgba(0,0,0,0.5);font-family:Arial;font-size:14px;transition:0.2s';
-                                b.onclick = async function () {
-                                    b.innerText = '🔥 Preenchendo...';
-                                    b.style.background = '#c0392b';
-                                    b.disabled = true;
-                                    var k = 0;
-                                    var wait = ms => new Promise(r => setTimeout(r, ms));
-                                    while (k < 30 && window._sawState.index < window._sawState.codigos.length) {
-                                        var currCode = window._sawState.codigos[window._sawState.index];
-                                        var currQtd = window._sawState.counts[currCode];
-                                        var idBase = '#procedimentosSolicitados\\[' + k + '\\]\\.';
-                                        if (k >= 5) {
-                                            var tentou = 0;
-                                            while (!doc.querySelector(idBase + 'tipo') && tentou < 3) {
-                                                var btnAdd = doc.querySelector('#qata-adicionar');
-                                                if (btnAdd) {
-                                                    btnAdd.click();
-                                                    for (var over = 0; over < 150; over++) {
-                                                        var blk = doc.querySelector('.blockUI, .loading, .overlay, [class*="aguarde"], .modal-backdrop');
-                                                        if (!blk || blk.offsetParent === null) break;
-                                                        await wait(1);
-                                                    }
-                                                    for (var wL = 0; wL < 50; wL++) {
-                                                        if (doc.querySelector(idBase + 'tipo')) break;
-                                                        await wait(1);
-                                                    }
-                                                }
-                                                tentou++;
-                                            }
-                                        }
-                                        var tab = doc.querySelector(idBase + 'tipo');
-                                        if (!tab) {
-                                            b.innerText = '⚠️ Travou no ' + currCode + '.';
-                                            b.style.background = '#f39c12';
-                                            b.disabled = false;
-                                            return;
-                                        }
-                                        if (tab.tagName === 'SELECT') {
-                                            Array.from(tab.options).forEach(o => {
-                                                if (o.text.toUpperCase().includes('TUSS') || o.text.includes('22 - Procedimentos')) tab.value = o.value;
-                                            });
-                                            tab.dispatchEvent(new Event('change', { bubbles: true }));
-                                        } else {
-                                            tab.click();
-                                            await wait(1);
-                                            var xp = doc.evaluate("//*[contains(text(), 'TUSS') or contains(text(), '22 - Procedimentos') or contains(text(), '22-Procedimentos')]", doc, null, 9, null);
-                                            for (var j = 0; j < xp.snapshotLength; j++) {
-                                                var n = xp.snapshotItem(j);
-                                                if (n.offsetParent !== null && n.innerText.length < 60) {
-                                                    n.click();
-                                                    break;
-                                                }
-                                            }
-                                        }
-                                        var inp = doc.querySelector(idBase + 'codigo');
-                                        if (inp) {
-                                            inp.value = currCode;
-                                            inp.dispatchEvent(new Event('input', { bubbles: true }));
-                                            inp.dispatchEvent(new Event('change', { bubbles: true }));
-                                        }
-                                        var qtd = doc.querySelector(idBase + 'quantidade');
-                                        if (qtd) {
-                                            qtd.value = currQtd;
-                                            qtd.dispatchEvent(new Event('input', { bubbles: true }));
-                                            qtd.dispatchEvent(new Event('change', { bubbles: true }));
-                                        }
-                                        var desc = doc.querySelector(idBase + 'descricao');
-                                        if (desc) {
-                                            desc.click();
-                                            desc.focus();
-                                            desc.dispatchEvent(new MouseEvent('mousedown', { bubbles: true }));
-                                        }
-                                        k++;
-                                        window._sawState.index++;
-                                        await wait(1);
-                                    }
-                                    if (window._sawState.index < window._sawState.codigos.length) {
-                                        b.innerText = '✅ 30 INSERIDOS! Salve e abra nova guia.';
-                                        b.style.background = '#8e44ad';
-                                    } else {
-                                        b.innerText = '✅ TUDO FINALIZADO!';
-                                        b.style.background = '#27ae60';
-                                        window._sawGatilho = false;
-                                    }
-                                    setTimeout(() => b.remove(), 7000);
+                            if (!doc || doc.readyState !== 'complete') return;
+                            if (doc.getElementById('btn-robo-saw')) { clearInterval(checkLoad); return; }
+                            // A tela serve se tiver os campos do formulário OU a lista de tabelas TUSS
+                            var temCampos = doc.querySelector("[id*='procedimentosSolicitados']");
+                            var temTuss = Array.from(doc.querySelectorAll('select')).some(function (s) {
+                                return Array.from(s.options || []).some(function (o) {
+                                    return /procedimentos?\s+e\s+eventos/i.test(o.textContent || '');
+                                });
+                            });
+                            if (!temCampos && !temTuss) return;
+                            clearInterval(checkLoad);
+
+                            var b = doc.createElement('button');
+                            b.id = 'btn-robo-saw';
+                            var teto = Math.min(window._sawState.index + 30, window._sawState.codigos.length);
+                            b.innerText = '🤖 COLAR CÓDIGOS (' + (window._sawState.index + 1) + ' a ' + teto + ')';
+                            b.style.cssText = 'position:fixed;top:20px;right:20px;z-index:9999999;padding:15px 20px;background:#e67e22;color:#fff;border:3px solid #d35400;border-radius:8px;font-weight:bold;cursor:pointer;box-shadow:0 5px 15px rgba(0,0,0,0.5);font-family:Arial;font-size:14px;';
+                            doc.body.appendChild(b);
+
+                            var wait = ms => new Promise(r => setTimeout(r, ms));
+                            var visivel = function (e) {
+                                try { var r = e.getBoundingClientRect(); return r.width > 0; } catch (x) { return false; }
+                            };
+
+                            // ── Jeito 1: campos com nome procedimentosSolicitados[N].algo ──
+                            // Descobrimos o sufixo real de cada campo em vez de supor
+                            // ".tipo/.codigo/.quantidade" — cada portal usa um nome.
+                            var linhasPorId = function () {
+                                var grupos = {};
+                                Array.from(doc.querySelectorAll("[id*='procedimentosSolicitados']")).forEach(function (e) {
+                                    var mm = (e.id || '').match(/procedimentosSolicitados\[(\d+)\]\.?(.*)$/);
+                                    if (!mm) return;
+                                    var i = parseInt(mm[1], 10);
+                                    grupos[i] = grupos[i] || {};
+                                    grupos[i][mm[2] || 'raiz'] = e;
+                                });
+                                var achar = function (g, re, tag) {
+                                    for (var k in g) if (re.test(k) && (!tag || g[k].tagName === tag)) return g[k];
+                                    return null;
                                 };
-                                doc.body.appendChild(b);
-                            }
+                                return Object.keys(grupos).sort(function (a, c) { return a - c; }).map(function (i) {
+                                    var g = grupos[i];
+                                    var tab = achar(g, /tipo|tabela/i, 'SELECT') || achar(g, /tipo|tabela/i);
+                                    var cod = achar(g, /^codigo$|^cod$|codigoproc/i, 'INPUT') || achar(g, /codigo/i, 'INPUT');
+                                    var qt = achar(g, /quant|qtd/i, 'INPUT');
+                                    var de = achar(g, /desc/i, 'INPUT') || achar(g, /desc/i);
+                                    return (cod && qt) ? { tabela: tab, codigo: cod, desc: de, qtd: qt } : null;
+                                }).filter(Boolean);
+                            };
+
+                            // ── Jeito 2: pelos rótulos das colunas (25-Código, 26-Descrição, 27-Qt.) ──
+                            var linhasPorColuna = function () {
+                                try {
+                                    var selects = Array.from(doc.querySelectorAll('select')).filter(function (s) {
+                                        return Array.from(s.options || []).some(function (o) {
+                                            return /procedimentos?\s+e\s+eventos/i.test(o.textContent || '');
+                                        });
+                                    });
+                                    if (!selects.length) return [];
+                                    var tb = selects[0].closest && selects[0].closest('table');
+                                    var mapa = null;
+                                    if (tb) {
+                                        Array.from(tb.rows || []).forEach(function (tr) {
+                                            if (mapa) return;
+                                            var t = Array.from(tr.cells || []).map(function (c) {
+                                                return (c.textContent || '').replace(/\s+/g, ' ').trim();
+                                            });
+                                            var onde = function (p) { return t.findIndex(function (x) { return x.indexOf(p) === 0; }); };
+                                            var a = onde('25-'), d2 = onde('26-'), q = onde('27-');
+                                            if (a >= 0 && q >= 0) mapa = { cod: a, desc: d2, qtd: q };
+                                        });
+                                    }
+                                    if (!mapa) return [];
+                                    return selects.map(function (sel) {
+                                        var tr = sel.closest('tr');
+                                        if (!tr || !tr.cells) return null;
+                                        var pega = function (i) {
+                                            var cel = tr.cells[i];
+                                            return cel ? cel.querySelector('input:not([type=hidden]):not([type=button]):not([type=submit]):not([type=checkbox]):not([type=radio])') : null;
+                                        };
+                                        var cod = pega(mapa.cod), qt = pega(mapa.qtd);
+                                        var de = mapa.desc >= 0 ? pega(mapa.desc) : null;
+                                        return (cod && qt && cod !== qt) ? { tabela: sel, codigo: cod, desc: de, qtd: qt } : null;
+                                    }).filter(Boolean);
+                                } catch (e) { return []; }
+                            };
+
+                            var linhas = function () {
+                                var a = linhasPorId();
+                                return a.length ? a : linhasPorColuna();
+                            };
+
+                            var botaoAdicionar = function () {
+                                var x = doc.querySelector('#qata-adicionar');
+                                if (x && visivel(x)) return x;
+                                return Array.from(doc.querySelectorAll('input[type=button],input[type=submit],button,a'))
+                                    .find(function (e) {
+                                        var t = ((e.value || '') + ' ' + (e.textContent || '')).trim().toLowerCase();
+                                        return (t === 'adicionar' || /(^|\s)adicionar(\s|$)/.test(t)) && visivel(e);
+                                    });
+                            };
+
+                            var escolherTuss = function (sel) {
+                                if (!sel) return;
+                                if (sel.tagName === 'SELECT') {
+                                    var op = Array.from(sel.options).find(function (o) {
+                                        return /procedimentos?\s+e\s+eventos/i.test(o.textContent || '')
+                                            || /^22\b/.test((o.textContent || '').trim());
+                                    });
+                                    if (op) {
+                                        sel.value = op.value;
+                                        sel.dispatchEvent(new Event('input', { bubbles: true }));
+                                        sel.dispatchEvent(new Event('change', { bubbles: true }));
+                                        try { if (typeof sel.onchange === 'function') sel.onchange(); } catch (e) { }
+                                    }
+                                } else {
+                                    try { sel.click(); } catch (e) { }
+                                }
+                            };
+
+                            var escrever = function (el, v) {
+                                if (!el) return;
+                                try { el.focus(); } catch (e) { }
+                                try {
+                                    var dsc = Object.getOwnPropertyDescriptor(winAlvo.HTMLInputElement.prototype, 'value');
+                                    if (dsc && dsc.set) dsc.set.call(el, String(v)); else el.value = v;
+                                } catch (e) { el.value = v; }
+                                el.dispatchEvent(new Event('input', { bubbles: true }));
+                                el.dispatchEvent(new Event('change', { bubbles: true }));
+                            };
+
+                            b.onclick = async function () {
+                                b.style.background = '#c0392b';
+                                b.disabled = true;
+                                var feitos = 0;
+
+                                if (!linhas().length) {
+                                    b.innerText = '⚠️ Não achei a tabela de procedimentos nesta tela.';
+                                    b.style.background = '#f39c12';
+                                    b.disabled = false;
+                                    return;
+                                }
+
+                                while (feitos < 30 && window._sawState.index < window._sawState.codigos.length) {
+                                    var cod = window._sawState.codigos[window._sawState.index];
+                                    var qtd = window._sawState.counts[cod];
+                                    b.innerText = '⏳ ' + (window._sawState.index + 1) + '/' +
+                                                  window._sawState.codigos.length + ' — ' + cod;
+
+                                    // Garante uma linha vazia; se acabarem, clica em "Adicionar"
+                                    var linha = null, pediu = false;
+                                    for (var t = 0; t < 50; t++) {
+                                        var todas = linhas();
+                                        linha = todas.find(function (l) { return !(l.codigo.value || '').trim(); });
+                                        if (linha) break;
+                                        if (!pediu) {
+                                            var add = botaoAdicionar();
+                                            if (!add) break;
+                                            b.innerText = '➕ Abrindo mais linhas...';
+                                            add.click();
+                                            pediu = true;
+                                        }
+                                        await wait(300);
+                                    }
+                                    if (!linha) {
+                                        b.innerText = '⚠️ Sem linha livre no ' + cod + '. Salve e clique de novo.';
+                                        b.style.background = '#f39c12';
+                                        b.disabled = false;
+                                        return;
+                                    }
+
+                                    escolherTuss(linha.tabela);
+                                    await wait(250);
+
+                                    escrever(linha.codigo, cod);
+                                    try { linha.codigo.blur(); } catch (e) { }
+                                    linha.codigo.dispatchEvent(new Event('blur', { bubbles: true }));
+                                    linha.codigo.dispatchEvent(new Event('focusout', { bubbles: true }));
+
+                                    // Espera o portal trazer o nome do exame
+                                    for (var w2 = 0; w2 < 40; w2++) {
+                                        var at = linhas().find(function (l) { return (l.codigo.value || '').trim() === cod; });
+                                        if (at) {
+                                            linha = at;
+                                            if (at.desc && (at.desc.value || '').trim().length > 1) break;
+                                        }
+                                        await wait(250);
+                                    }
+
+                                    escrever(linha.qtd, qtd);
+                                    try { linha.qtd.blur(); } catch (e) { }
+                                    linha.qtd.dispatchEvent(new Event('blur', { bubbles: true }));
+
+                                    await wait(250);
+                                    feitos++;
+                                    window._sawState.index++;
+                                }
+
+                                if (window._sawState.index < window._sawState.codigos.length) {
+                                    b.innerText = '✅ 30 inseridos! Salve e abra uma guia nova.';
+                                    b.style.background = '#8e44ad';
+                                } else {
+                                    b.innerText = '✅ TUDO FINALIZADO! (' + feitos + ' exames)';
+                                    b.style.background = '#27ae60';
+                                    window._sawGatilho = false;
+                                }
+                                setTimeout(function () { try { b.remove(); } catch (e) { } }, 9000);
+                            };
                         } catch (err) { }
                     }, 1000);
                 };
 
-                // Pega a janela de autorização quando o portal abrir
                 if (!window._sawOpenHooked) {
                     var origOpen = window.open;
                     window.open = function () {
-                        var winAlvo = origOpen.apply(this, arguments);
-                        if (winAlvo && window._sawGatilho) armarBotao(winAlvo);
-                        return winAlvo;
+                        var w = origOpen.apply(this, arguments);
+                        if (w && window._sawGatilho) armarBotao(w);
+                        return w;
                     };
                     window._sawOpenHooked = true;
                 }
                 window._sawArmar = armarBotao;
 
-                // Links com target="_blank" não passam pelo window.open: interceptamos o clique
                 if (!window._sawListenerAdded) {
                     document.addEventListener('click', function (e) {
                         var a = e.target.closest && e.target.closest('a');
@@ -2488,14 +2598,15 @@
                     window._sawListenerAdded = true;
                 }
 
-                // Se a janela de autorização já estiver aberta, arma nela também
+                // Se a tela de autorização já é ESTA janela, arma nela mesma
+                try { armarBotao(window); } catch (e) { }
                 try {
                     (window.__crJanelas || []).forEach(function (w) {
                         try { if (w && !w.closed) armarBotao(w); } catch (e) { }
                     });
                 } catch (e) { }
 
-                alert("Robô armado! Agora abra (ou volte para) a janela de autorização e clique no botão laranja \"COLAR CÓDIGOS\" que aparece no canto dela.");
+                alert("Robô armado! Abra (ou volte para) a janela de autorização e clique no botão laranja \"COLAR CÓDIGOS\".");
             })();
         },
         "AFFEGO": () => {
