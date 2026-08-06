@@ -1283,226 +1283,17 @@
         },
         "TST": () => {
             (function () {
-                if (document.getElementById('painel-tst')) return;
-
-                const p = document.createElement('div');
-                p.id = 'painel-tst';
-                p.style.cssText = 'position:fixed;top:10px;right:10px;width:310px;background:#0b3d3d;color:#fff;' +
-                    'padding:14px;z-index:2147483647;border-radius:8px;font-family:Arial,sans-serif;' +
-                    'box-shadow:0 4px 15px rgba(0,0,0,0.6);border:3px solid #008b8b;font-size:12px;';
-                p.innerHTML =
-                    '<h3 style="margin:0 0 8px;color:#7fe3e3;text-align:center;">⚖️ Lançador TST</h3>' +
-                    '<textarea id="tst-txt" style="width:100%;height:90px;box-sizing:border-box;color:#000;border-radius:4px;padding:5px;font-family:Consolas,monospace;" placeholder="Cole os códigos aqui..."></textarea>' +
-                    '<button id="tst-btn" style="width:100%;padding:10px;margin-top:6px;background:#00b894;color:#fff;border:none;border-radius:4px;font-weight:bold;cursor:pointer;">INICIAR ▶</button>' +
-                    '<button id="tst-stop" style="width:100%;padding:10px;margin-top:6px;background:#d63031;color:#fff;border:none;border-radius:4px;font-weight:bold;cursor:pointer;display:none;">⏹ PARAR</button>' +
-                    '<div id="tst-status" style="margin-top:9px;font-size:11px;color:#dfe6e9;line-height:1.5;white-space:pre-line;background:#062929;border-radius:5px;padding:8px;min-height:16px;">Preencha a guia e clique em INICIAR.</div>' +
-                    '<button id="tst-fechar" style="width:100%;padding:6px;margin-top:8px;background:#636e72;color:#fff;border:none;border-radius:4px;cursor:pointer;">❌ Fechar</button>';
-                document.body.appendChild(p);
-
-                const elId = i => document.getElementById(i);
-                const status = t => { elId('tst-status').innerText = t; };
-                const wait = ms => new Promise(r => setTimeout(r, ms));
-                let rodando = false;
-
-                const visivel = e => {
-                    try { const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; }
-                    catch (x) { return false; }
+                var b = document.createElement("button");
+                b.innerText = "⚖️ ROBÔ EQUILIBRADO (TUSS 16)";
+                b.style = "position:fixed;top:10px;left:50%;transform:translateX(-50%);padding:15px;background:#008b8b;color:white;font-weight:bold;border:3px solid white;z-index:9999999;box-shadow:0 0 20px #000;cursor:pointer;border-radius:8px;font-family:monospace;font-size:14px;";
+                b.onclick = function () {
+                    var w = window.open("", "RoboSafe", "width=400,height=600");
+                    if (!w) { alert('O navegador bloqueou a janelinha de controle.\nPermita pop-ups para este site e clique de novo.'); return; }
+                    var h = `<html><head><title>Robô Equilibrado</title><style>body{background:#111;color:#fff;font-family:sans-serif;padding:10px}textarea{width:100%;height:150px;background:#222;color:#0f0;border:1px solid #555;font-family:monospace}button{width:100%;padding:10px;margin-top:10px;cursor:pointer;font-weight:bold}.g{background:#0d0;color:#000}.r{background:#f33;color:#fff}#l{margin-top:10px;height:300px;overflow-y:auto;background:#000;border:1px solid #444;font-family:monospace;font-size:11px;padding:5px}</style></head><body><h3>⚖️ Robô TUSS (Estável)</h3><p>Cole a lista:</p><textarea id="t"></textarea><button class="g" onclick="go()">▶ INICIAR</button><button class="r" onclick="stop()">⏹ PARAR</button><div id="l"></div> <script> var r=false,idx=0,lst=[],win=window.opener; function log(m){ var d=document.createElement("div"); d.innerText="["+new Date().toLocaleTimeString()+"] "+m; document.getElementById("l").prepend(d) } function stop(){r=false;log("PARADO.")} function go(){ var v=document.getElementById("t").value; var raw=v.match(/\\b\\d{8}\\b/g); if(!raw)return alert("Sem códigos!"); var counts={}; raw.forEach(x=>counts[x]=(counts[x]||0)+1); var unicos=[...new Set(raw)]; var order=unicos.filter(c=>counts[c]===1).concat(unicos.filter(c=>counts[c]>1)); lst=order.map(k=>({cod:k,qtd:counts[k]})); if(!win||win.closed)return alert("Janela principal fechada!"); r=true;idx=0;log("Iniciando "+lst.length+" itens...");loop() } async function waitEl(sel,timeout=5000){ var t=0; while(t<timeout){ if(!r)throw new Error("Parado"); var el=win.document.querySelector(sel); if(el&&el.offsetParent!==null)return el; await new Promise(x=>setTimeout(x,200)); t+=200 } throw new Error("Timeout: "+sel) } async function pause(ms){await new Promise(x=>setTimeout(x,ms))} async function loop(){ if(!r)return; if(idx>=lst.length){r=false;return alert("FIM!")} var item=lst[idx],c=item.cod,q=item.qtd; log("Item "+(idx+1)+": "+c+(q>1?" (Qtd: "+q+")":"")); try{ log("Aguardando botão..."); await waitEl("input[value='Adicionar Procedimento']",10000); await pause(500); var b1=win.document.querySelector("input[value='Adicionar Procedimento']")||win.document.querySelector("input[name='adicionarProcedimento']"); b1.click(); var fixo=await waitEl("#noreset_txCodTabela"); await pause(500); fixo.value="16"; fixo.dispatchEvent(new win.Event('change',{bubbles:true})); fixo.dispatchEvent(new win.Event('blur',{bubbles:true})); try{win.$(fixo).trigger('change')}catch(e){} var inp=await waitEl("#codItemProcedimento"); await pause(300); inp.value=c; inp.dispatchEvent(new win.Event('change',{bubbles:true})); inp.dispatchEvent(new win.Event('blur',{bubbles:true})); var qtd=win.document.getElementById("procedimento.numQtdSolicitada"); if(qtd){ qtd.value=q; qtd.dispatchEvent(new win.Event('input',{bubbles:true})); qtd.dispatchEvent(new win.Event('change',{bubbles:true})); } await pause(500); var b2=await waitEl(".ui-dialog-buttonpane button:nth-child(2)"); if(!b2.innerText.includes("Salvar")&&!b2.innerText.includes("Confirmar")){ var bs=win.document.querySelectorAll("button"); for(var b of bs)if(b.innerText.includes("Salvar"))b2=b } b2.click(); log("Salvo! Aguardando..."); idx++; await pause(1500); loop() }catch(e){ log("ERRO: "+e.message); r=false; alert("Erro: "+e.message) } } <\/script></body></html>`;
+                    w.document.write(h);
+                    this.remove()
                 };
-                const util = e => e && visivel(e) && !e.disabled && e.type !== 'hidden'
-                    && e.type !== 'button' && e.type !== 'submit' && e.type !== 'image';
-
-                const setNativo = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
-                const escrever = (el, v) => {
-                    if (!el) return;
-                    try { el.focus(); } catch (e) { }
-                    try { setNativo.call(el, String(v)); } catch (e) { el.value = v; }
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                };
-                const sair = el => {   // "clicar fora" — é isso que faz o portal buscar o nome
-                    if (!el) return;
-                    try { el.blur(); } catch (e) { }
-                    el.dispatchEvent(new Event('blur', { bubbles: true }));
-                    el.dispatchEvent(new Event('focusout', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                };
-                const esperar = async (cond, voltas) => {
-                    for (let k = 0; k < (voltas || 40); k++) {
-                        if (!rodando) return false;
-                        try { if (cond()) return true; } catch (e) { }
-                        await wait(250);
-                    }
-                    return false;
-                };
-
-                // ── Botão "Adicionar Procedimento" da tela principal ──
-                const btnAbrir = () => Array.from(document.querySelectorAll('input[type=button],input[type=submit],button,a'))
-                    .find(b => {
-                        const t = ((b.value || '') + ' ' + (b.textContent || '')).replace(/\s+/g, ' ').trim();
-                        return /^adicionar\s+procedimento$/i.test(t) && visivel(b);
-                    });
-
-                // ── A janelinha "Adicionar Procedimento" ──
-                const dialogo = () => {
-                    const cands = Array.from(document.querySelectorAll('div,form,table'))
-                        .filter(d => visivel(d)
-                            && /adicionar\s+procedimento/i.test(d.textContent || '')
-                            && d.querySelector('select')
-                            && (d.textContent || '').length < 2500
-                            && Array.from(d.querySelectorAll('input')).filter(util).length >= 2);
-                    cands.sort((a, b) => (a.textContent || '').length - (b.textContent || '').length);
-                    return cands[0] || null;
-                };
-
-                // Acha o campo pela etiqueta da linha (*Tabela, *Procedimento, *Quantidade)
-                const porRotulo = (dlg, re, ordem) => {
-                    if (!dlg) return null;
-                    // Vai LINHA POR LINHA. Subir na tela procurando a etiqueta acaba
-                    // pegando a tabela inteira — e aí o campo escolhido é o errado.
-                    const linhas = Array.from(dlg.querySelectorAll('tr'));
-                    for (const tr of linhas) {
-                        const t = (tr.textContent || '').replace(/\s+/g, ' ').trim();
-                        if (!re.test(t) || t.length > 140) continue;
-                        const naLinha = Array.from(tr.querySelectorAll('input,select')).filter(util);
-                        if (naLinha.length) return naLinha[ordem || 0] || null;
-                    }
-                    // Sem tabela: acha a etiqueta e pega o campo logo ao lado dela
-                    const rotulos = Array.from(dlg.querySelectorAll('td,label,span,div,p'))
-                        .filter(e => {
-                            const t = (e.textContent || '').replace(/\s+/g, ' ').trim();
-                            return re.test(t) && t.length < 40;
-                        });
-                    for (const r of rotulos) {
-                        let caixa = r.parentElement;
-                        for (let k = 0; k < 3 && caixa; k++) {
-                            const campos = Array.from(caixa.querySelectorAll('input,select')).filter(util);
-                            if (campos.length) return campos[ordem || 0] || null;
-                            caixa = caixa.parentElement;
-                        }
-                    }
-                    return null;
-                };
-
-                const campoTabela = () => {
-                    const e = document.getElementById('noreset_txCodTabela');
-                    if (util(e)) return e;
-                    const d = dialogo();
-                    if (!d) return null;
-                    return porRotulo(d, /tabela/i, 0) || d.querySelector('select');
-                };
-                const campoCodigo = () => {
-                    const e = document.getElementById('codItemProcedimento');
-                    if (util(e)) return e;
-                    return porRotulo(dialogo(), /procedimento/i, 0);
-                };
-                const campoDesc = () => porRotulo(dialogo(), /procedimento/i, 1);
-                const campoQtd = () => {
-                    const e = document.getElementById('procedimento.numQtdSolicitada');
-                    if (util(e)) return e;
-                    return porRotulo(dialogo(), /quantidade/i, 0);
-                };
-                // O "Adicionar" da janelinha — cuidado para não pegar o "Adicionar Procedimento"
-                const btnConfirmar = () => {
-                    const d = dialogo();
-                    const escopo = (d && (d.closest('.ui-dialog') || d.parentElement)) || document;
-                    return Array.from(escopo.querySelectorAll('button,input[type=button],input[type=submit],a'))
-                        .find(b => {
-                            const t = ((b.value || '') + ' ' + (b.textContent || '')).replace(/\s+/g, ' ').trim().toLowerCase();
-                            return t === 'adicionar' && visivel(b);
-                        });
-                };
-
-                const lerCodigos = () => {
-                    const brutos = (elId('tst-txt').value || '').match(/\b\d{8}\b/g) || [];
-                    const conta = {};
-                    brutos.forEach(c => conta[c] = (conta[c] || 0) + 1);
-                    return Object.keys(conta).map(c => ({ cod: c, qtd: conta[c] }));
-                };
-
-                const modo = liga => {
-                    rodando = liga;
-                    elId('tst-btn').style.display = liga ? 'none' : 'block';
-                    elId('tst-stop').style.display = liga ? 'block' : 'none';
-                    elId('tst-txt').disabled = liga;
-                };
-
-                elId('tst-fechar').onclick = () => { rodando = false; p.remove(); };
-                elId('tst-stop').onclick = () => { modo(false); status('⏹ Interrompido.'); };
-
-                elId('tst-btn').onclick = async () => {
-                    const itens = lerCodigos();
-                    if (!itens.length) { status('❌ Nenhum código de 8 dígitos encontrado.'); return; }
-                    modo(true);
-
-                    for (let i = 0; i < itens.length; i++) {
-                        if (!rodando) return;
-                        const cod = itens[i].cod, qtd = itens[i].qtd;
-                        const passo = (i + 1) + '/' + itens.length;
-
-                        // 1) abre a janelinha "Adicionar Procedimento"
-                        status('⏳ ' + passo + ' — abrindo a janela para ' + cod + '...');
-                        if (!campoCodigo()) {
-                            const ab = btnAbrir();
-                            if (!ab) {
-                                status('❌ Não achei o botão "Adicionar Procedimento" na tela.\nConfira se a guia está aberta.');
-                                modo(false); return;
-                            }
-                            ab.click();
-                            if (!await esperar(() => !!campoCodigo(), 40)) {
-                                status('❌ A janela "Adicionar Procedimento" não abriu para ' + cod + '.');
-                                modo(false); return;
-                            }
-                        }
-
-                        // 2) Tabela: sempre "Tabela TUSS"
-                        const tb = campoTabela();
-                        if (tb) {
-                            if (tb.tagName === 'SELECT') {
-                                const op = Array.from(tb.options).find(o => /tuss/i.test(o.textContent || ''));
-                                if (op) {
-                                    tb.value = op.value;
-                                    tb.dispatchEvent(new Event('input', { bubbles: true }));
-                                    tb.dispatchEvent(new Event('change', { bubbles: true }));
-                                    try { if (typeof tb.onchange === 'function') tb.onchange(); } catch (e) { }
-                                }
-                            } else {
-                                escrever(tb, '16');
-                                sair(tb);
-                            }
-                            await wait(400);
-                        }
-
-                        // 3) código do exame
-                        status('⏳ ' + passo + ' — código ' + cod + (qtd > 1 ? ' (qtd ' + qtd + ')' : ''));
-                        const cd = campoCodigo();
-                        if (!cd) { status('❌ Campo do procedimento sumiu no ' + cod + '.'); modo(false); return; }
-                        escrever(cd, cod);
-
-                        // 4) "clicar fora" para o portal preencher o nome
-                        sair(cd);
-                        const veio = await esperar(() => {
-                            const de = campoDesc();
-                            return de && (de.value || '').trim().length > 2;
-                        }, 40);
-                        if (!veio) status('⚠️ ' + cod + ': o nome não voltou — seguindo assim mesmo');
-
-                        // 5) quantidade
-                        const qt = campoQtd();
-                        if (qt) { escrever(qt, qtd); sair(qt); await wait(250); }
-
-                        // 6) botão "Adicionar" da janelinha
-                        const ok = btnConfirmar();
-                        if (!ok) { status('❌ Não achei o botão "Adicionar" da janela no ' + cod + '.'); modo(false); return; }
-                        ok.click();
-
-                        // 7) espera a janelinha fechar e volta para o próximo
-                        await esperar(() => !campoCodigo(), 40);
-                        await wait(500);
-                    }
-
-                    status('✅ Finalizado! ' + itens.length + ' exame(s) lançado(s).');
-                    modo(false);
-                };
+                document.body.appendChild(b);
             })();
         },
         "POSTAL": () => {
@@ -2877,7 +2668,7 @@
         "TRE":              { icone: "🗳️", cor: "#7f9fc4", desc: "Automação para Tribunal Regional Eleitoral",     modo: "prompt" },
         "TRF":              { icone: "📖", cor: "#1d9e75", desc: "Automação para Tribunal Regional Federal",       modo: "prompt" },
         "TRT":              { icone: "🤝", cor: "#e67e22", desc: "Automação para Tribunal Regional do Trabalho",   modo: "painel", txt: "g-txt",         btn: "g-btn" },
-        "TST":              { icone: "🔨", cor: "#e24b4a", desc: "Automação para Tribunal Superior do Trabalho",   modo: "painel", txt: "tst-txt",       btn: "tst-btn" }
+        "TST":              { icone: "🔨", cor: "#e24b4a", desc: "Automação para Tribunal Superior do Trabalho",   modo: "tst" }
     };
 
     // ── ONDE CADA ROBÔ MOSTRA O PROGRESSO DELE ───────────────────
@@ -2889,8 +2680,7 @@
         "PLANASSISTE MPU": "rs",
         "PLENUM": "plenum-status",
         "TJDF": "b403-status",
-        "TRT": "g-status",
-        "TST": "tst-status"
+        "TRT": "g-status"
     };
 
     // Robôs cujo contador fica num elemento separado do status
