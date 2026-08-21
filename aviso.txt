@@ -1,2 +1,2 @@
 1-  ASSEDF/VIDACARD em fase de teste. Favor não usa-lo
-2- CNU UNIMED copiar os 30 primeiros exames da Shift caso tenha mais do que 30 exames, pois no momento o robô esta copiando em ordem alfabética e não na ordem da shift ( até correção )
+2- CNU UNIMED copiar os 30 primeiros exames da Shift caso tenha mais do que 30 exames, pois no momento o robô esta lançando os exames em ordem alfabética e não na ordem copiada da shift ( até que seja feita a correção )
