@@ -1,1 +1,2 @@
 Robô ASSEDF/VIDACARD em fase de teste. Favor não usa-lo
+ASSEFAZ com instabilidade
