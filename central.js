@@ -2176,9 +2176,13 @@
                 if (!txt) return;
                 var brutos = txt.match(/\b\d{8}\b/g);
                 if (!brutos) { alert("Nenhum código de 8 dígitos encontrado!"); return; }
+                // Object.keys devolve chaves numéricas em ordem crescente — aqui
+                // montamos percorrendo o texto, para manter a ordem em que foi colado.
                 var conta = {};
                 brutos.forEach(function (c) { conta[c] = (conta[c] || 0) + 1; });
-                var itens = Object.keys(conta).map(function (c) { return { cod: c, qtd: conta[c] }; });
+                var unicos = [];
+                brutos.forEach(function (c) { if (unicos.indexOf(c) === -1) unicos.push(c); });
+                var itens = unicos.map(function (c) { return { cod: c, qtd: conta[c] }; });
 
                 var antigo = document.getElementById('painel-assedf');
                 if (antigo) antigo.remove();
@@ -3610,9 +3614,13 @@
                 ctx.fim();
                 return;
             }
+            // ATENÇÃO: Object.keys devolve chaves numéricas em ordem CRESCENTE,
+            // não na ordem em que foram coladas. Por isso montamos a lista
+            // percorrendo o texto, para respeitar a ordem do atendente.
             const contagem = {};
             brutos.forEach(c => contagem[c] = (contagem[c] || 0) + 1);
-            let unicos = Object.keys(contagem);
+            let unicos = [];
+            brutos.forEach(c => { if (unicos.indexOf(c) === -1) unicos.push(c); });
             let aviso = '';
             if (unicos.length > LIMITE) {
                 aviso = ' ⚠️ o Unimed aceita no máximo 30 — os demais ficaram de fora';
