@@ -2255,6 +2255,71 @@
                     return null;
                 };
 
+                // Se não houver linha livre, pode ter sobrado um código de uma
+                // tentativa anterior que não entrou. A linha ainda é editável
+                // (as já inseridas viram texto), então dá para limpar e reusar.
+                var linhaParaUsar = function (w) {
+                    var l = linhaDe(w);
+                    if (l) return l;
+                    var bts = botoesInserir(w);
+                    for (var i = 0; i < bts.length; i++) {
+                        var tr = bts[i].closest ? bts[i].closest('tr') : null;
+                        if (!tr) continue;
+                        var ins = digitaveis(tr);
+                        if (!ins.length) continue;
+                        try {
+                            ins[0].value = '';
+                            if (ins.length >= 3) ins[1].value = '';
+                        } catch (e) { }
+                        return {
+                            tr: tr, inserir: bts[i], cod: ins[0],
+                            desc: ins.length >= 3 ? ins[1] : null,
+                            qtd: ins.length >= 3 ? ins[2] : (ins.length === 2 ? ins[1] : null)
+                        };
+                    }
+                    return null;
+                };
+
+                // ── Clicar em "Inserir" ──
+                // O portal é antigo: o "Inserir" pode ser link, botão ou script.
+                // Tentamos um jeito de cada vez e conferimos se entrou antes de
+                // tentar o próximo — assim nunca inserimos o mesmo exame duas vezes.
+                var entrou = function (w, linha) {
+                    try {
+                        if (linha.cod && linha.cod.isConnected === false) return true;
+                        var nova = linhaDe(w);
+                        if (nova && nova.cod !== linha.cod) return true;
+                    } catch (e) { }
+                    return false;
+                };
+
+                var clicarInserir = async function (w, linha) {
+                    var el = linha.inserir;
+                    var jeitos = [
+                        function () { el.click(); },
+                        function () {
+                            var M = (w && w.MouseEvent) || MouseEvent;
+                            ['mouseover', 'mousedown', 'mouseup', 'click'].forEach(function (t) {
+                                el.dispatchEvent(new M(t, { bubbles: true, cancelable: true }));
+                            });
+                        },
+                        function () { if (typeof el.onclick === 'function') el.onclick(); },
+                        function () {
+                            var h = el.getAttribute && el.getAttribute('href');
+                            if (h && /^javascript:/i.test(h)) w.eval(h.replace(/^javascript:/i, ''));
+                        }
+                    ];
+                    for (var j = 0; j < jeitos.length; j++) {
+                        try { jeitos[j](); } catch (e) { }
+                        for (var k = 0; k < 12; k++) {
+                            await espera(250);
+                            if (recusou(w)) return 'recusado';
+                            if (entrou(w, linha)) return 'ok';
+                        }
+                    }
+                    return 'falhou';
+                };
+
                 // ── Encontrar a janela da tela de procedimentos ──
                 var acharJanela = function () {
                     var lista = [];
@@ -2401,7 +2466,7 @@
 
                     // ── ETAPA 2: a tela está aberta — lançar os códigos ──
                     window._assedfJanela = jan;
-                    var lancados = 0, recusados = [];
+                    var lancados = 0, recusados = [], parouPor = null;
 
                     for (var i = 0; i < itens.length; i++) {
                         if (!jan || jan.closed) { diz('❌ A tela de procedimentos foi fechada.'); return; }
@@ -2411,11 +2476,11 @@
 
                         var linha = null;
                         for (var t = 0; t < 40; t++) {
-                            linha = linhaDe(jan);
+                            linha = linhaParaUsar(jan);
                             if (linha) break;
                             await espera(300);
                         }
-                        if (!linha) { diz('❌ Parei no ' + cod + ': não apareceu linha livre.'); break; }
+                        if (!linha) { parouPor = 'não apareceu linha para preencher (código ' + cod + ')'; break; }
 
                         escrever(linha.cod, cod);
                         sairDoCampo(linha.cod);
@@ -2441,10 +2506,9 @@
                         if (linha.qtd) { escrever(linha.qtd, qtd); sairDoCampo(linha.qtd); await espera(200); }
 
                         limparAviso(jan);
-                        try { linha.inserir.click(); } catch (e) { }
-                        await espera(900);
+                        var res = await clicarInserir(jan, linha);
 
-                        if (recusou(jan)) {
+                        if (res === 'recusado') {
                             recusados.push(nome || cod);
                             limparAviso(jan);
                             try {
@@ -2454,18 +2518,22 @@
                             } catch (e) { }
                             diz('⚠️ ' + (nome || cod) + ' não entrou — seguindo para o próximo');
                             await espera(600);
+                        } else if (res === 'falhou') {
+                            parouPor = 'o botão "Inserir" não respondeu no código ' + cod;
+                            break;
                         } else {
                             lancados++;
                         }
                     }
 
-                    var fim = '✅ Concluído! ' + lancados + ' de ' + itens.length + ' exame(s) lançado(s).';
+                    var fim = (parouPor ? '⚠️ Parei: ' + parouPor + '\n' : '✅ Concluído! ') +
+                              lancados + ' de ' + itens.length + ' exame(s) lançado(s).';
                     if (recusados.length) {
                         fim += '\n⚠️ ' + recusados.join(', ') +
                                (recusados.length > 1 ? ' não entraram' : ' não entrou') +
                                ' devido paciente ter realizado recente';
                     }
-                    fim += '\nConfira na tela e clique em Gravar.';
+                    fim += '\nConfira na tela e clique em Gravar.\n(automação finalizada)';
                     diz(fim);
                 })();
             })();
