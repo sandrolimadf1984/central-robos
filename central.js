@@ -2201,43 +2201,132 @@
                     catch (x) { return false; }
                 };
 
-                // ── 1) Achar e clicar em "Cadastrar Procedimentos" ──
-                var botaoCadastrar = function () {
-                    return Array.from(document.querySelectorAll('input[type=button],input[type=submit],button,a'))
-                        .find(function (b) {
-                            var t = ((b.value || '') + ' ' + (b.textContent || '')).replace(/\s+/g, ' ').trim();
-                            return /cadastrar\s+procedimentos/i.test(t) && visivel(b);
+                // ── 1) Achar a tela de procedimentos ──
+                // A página é antiga e pode usar quadros (frames); o botão pode estar
+                // dentro de um deles, então procuramos em todos.
+                var documentos = function () {
+                    var lista = [document];
+                    try {
+                        Array.from(document.querySelectorAll('iframe,frame')).forEach(function (f) {
+                            try { if (f.contentDocument) lista.push(f.contentDocument); } catch (e) { }
                         });
+                    } catch (e) { }
+                    return lista;
+                };
+
+                var botaoCadastrar = function () {
+                    var achado = null;
+                    documentos().forEach(function (d) {
+                        if (achado) return;
+                        try {
+                            achado = Array.from(d.querySelectorAll('input[type=button],input[type=submit],button,a'))
+                                .find(function (b) {
+                                    var t = ((b.value || '') + ' ' + (b.textContent || '')).replace(/\s+/g, ' ').trim();
+                                    return /cadastrar\s+procedimentos/i.test(t);
+                                }) || null;
+                        } catch (e) { }
+                    });
+                    return achado;
+                };
+
+                // O endereço da tela de procedimentos costuma estar no próprio botão
+                // ou nos scripts da página — se acharmos, abrimos nós mesmos e a
+                // janela passa a ser nossa, sem depender de capturar nada.
+                var enderecoProcedimentos = function () {
+                    var texto = '';
+                    try {
+                        var bt = botaoCadastrar();
+                        if (bt) texto += ' ' + (bt.getAttribute('href') || '') + ' ' + (bt.getAttribute('onclick') || '');
+                        documentos().forEach(function (d) {
+                            try {
+                                Array.from(d.querySelectorAll('[onclick],a[href],form[action]')).forEach(function (e) {
+                                    texto += ' ' + (e.getAttribute('onclick') || '') + ' ' +
+                                             (e.getAttribute('href') || '') + ' ' + (e.getAttribute('action') || '');
+                                });
+                                Array.from(d.querySelectorAll('script')).forEach(function (sc) {
+                                    if (!sc.src) texto += ' ' + (sc.textContent || '');
+                                });
+                            } catch (e) { }
+                        });
+                    } catch (e) { }
+                    var m = texto.match(/[^'"\s(),]*GPSC0005b\.php[^'"\s(),]*/i);
+                    if (!m) return null;
+                    try { return new URL(m[0], document.baseURI).href; } catch (e) { return m[0]; }
+                };
+
+                // Serve como tela de procedimentos? (tem a tabela com as colunas certas)
+                var serve = function (w) {
+                    try {
+                        if (!w || w.closed || !w.document) return false;
+                        var d = w.document;
+                        if (d.readyState !== 'complete') return false;
+                        var t = (d.body ? (d.body.innerText || d.body.textContent || '') : '');
+                        return /procedimento/i.test(t) && /qtde|qtd\.|quantidade/i.test(t)
+                            && d.querySelector('input');
+                    } catch (e) { return false; }
                 };
 
                 var janela = null;
+                var achouBotao = false, capturou = false;
+
+                var candidatas = function () {
+                    var l = [];
+                    if (janela) l.push(janela);
+                    try { (window.__crJanelas || []).slice().reverse().forEach(function (w) { l.push(w); }); } catch (e) { }
+                    return l;
+                };
+
+                var pegarCandidata = function () {
+                    var l = candidatas();
+                    for (var i = 0; i < l.length; i++) if (serve(l[i])) return l[i];
+                    return null;
+                };
+
+                // Vigia toda janela que a página abrir (aqui, no topo e no pai)
+                var hooks = [];
+                var vigiarAberturas = function () {
+                    [window, window.top, window.parent].forEach(function (alvo) {
+                        try {
+                            if (!alvo || hooks.indexOf(alvo) !== -1) return;
+                            var orig = alvo.open;
+                            alvo.open = function () {
+                                var w = orig.apply(alvo, arguments);
+                                if (w) { janela = w; capturou = true; }
+                                return w;
+                            };
+                            hooks.push(alvo);
+                            setTimeout(function () { try { if (alvo.open !== orig) alvo.open = orig; } catch (e) { } }, 15000);
+                        } catch (e) { }
+                    });
+                };
+
                 var abrirJanela = function () {
+                    // Já existe uma tela de procedimentos aberta? uso ela.
+                    var pronta = pegarCandidata();
+                    if (pronta) { janela = pronta; capturou = true; return true; }
+
                     var bt = botaoCadastrar();
-                    if (!bt) return false;
+                    achouBotao = !!bt;
+                    vigiarAberturas();
 
-                    // Se for um link com destino, aponto para um nome meu e depois
-                    // recupero a janela por esse nome — uma tentativa só, sem chutes.
-                    var nomeAlvo = null;
-                    try {
-                        if (bt.tagName === 'A' && bt.getAttribute('target')) {
-                            nomeAlvo = 'crAssedf';
-                            bt.setAttribute('target', nomeAlvo);
-                        }
-                    } catch (e) { }
-
-                    var origOpen = window.open;
-                    window.open = function () {
-                        var w = origOpen.apply(window, arguments);
-                        if (w) janela = w;
-                        return w;
-                    };
-                    try { bt.click(); } catch (e) { }
-                    setTimeout(function () { if (window.open !== origOpen) window.open = origOpen; }, 4000);
-
-                    if (!janela && nomeAlvo) {
-                        try { janela = origOpen.call(window, '', nomeAlvo); } catch (e) { }
+                    if (bt) {
+                        try {
+                            if (bt.tagName === 'A' && bt.getAttribute('target')) bt.setAttribute('target', 'crAssedfProc');
+                        } catch (e) { }
+                        try { bt.click(); } catch (e) { }
                     }
                     return true;
+                };
+
+                // Último recurso: abrir o endereço nós mesmos
+                var abrirPorEndereco = function () {
+                    var url = enderecoProcedimentos();
+                    if (!url) return false;
+                    try {
+                        var w = window.open(url, 'crAssedfProc', 'width=1000,height=700,scrollbars=yes,resizable=yes');
+                        if (w) { janela = w; capturou = true; return true; }
+                    } catch (e) { }
+                    return false;
                 };
 
                 // ── 2) Os campos da janela de procedimentos ──
@@ -2343,21 +2432,34 @@
                 // ── 3) O trabalho ──
                 (async function () {
                     diz('⏳ Abrindo a tela de procedimentos...');
-                    if (!abrirJanela()) {
-                        diz('❌ Não achei o botão "Cadastrar Procedimentos".\nClique em Verificar e Gravar antes de iniciar.');
-                        return;
-                    }
+                    abrirJanela();
 
-                    // espera a janela abrir e mostrar a tabela
-                    var pronta = false;
-                    for (var k = 0; k < 60; k++) {
-                        try { if (janela && !janela.closed && janela.document
-                            && janela.document.readyState === 'complete' && mapaColunas()) { pronta = true; break; } }
-                        catch (e) { }
+                    // Espera a janela ficar pronta. Se em 8 segundos nada aparecer,
+                    // abrimos o endereço por conta própria.
+                    var pronta = false, tentouEndereco = false;
+                    for (var k = 0; k < 80; k++) {
+                        var cand = pegarCandidata();
+                        if (cand) {
+                            janela = cand;
+                            if (mapaColunas()) { pronta = true; break; }
+                        }
+                        if (k === 16 && !tentouEndereco) {
+                            tentouEndereco = true;
+                            diz('⏳ Ainda abrindo... tentando por outro caminho.');
+                            abrirPorEndereco();
+                        }
                         await espera(500);
                     }
+
                     if (!pronta) {
-                        diz('❌ A tela de procedimentos não abriu.\nSe o navegador bloqueou a janela, permita pop-ups para este site.');
+                        var achouTabela = false;
+                        try { achouTabela = !!(janela && mapaColunas()); } catch (e) { }
+                        diz('❌ Não alcancei a tela de procedimentos.\n' +
+                            '• botão "Cadastrar Procedimentos": ' + (achouBotao ? 'encontrado' : 'NÃO encontrado') + '\n' +
+                            '• janela alcançada: ' + (capturou || janela ? 'sim' : 'NÃO') + '\n' +
+                            '• tabela de procedimentos: ' + (achouTabela ? 'sim' : 'NÃO') + '\n' +
+                            '\nSe a janela já estiver aberta, feche-a e clique em INICIAR de novo.\n' +
+                            'Se o navegador bloqueou pop-ups, permita para este site.');
                         return;
                     }
 
