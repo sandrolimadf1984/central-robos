@@ -2176,13 +2176,17 @@
                 if (!txt) return;
                 var brutos = txt.match(/\b\d{8}\b/g);
                 if (!brutos) { alert("Nenhum código de 8 dígitos encontrado!"); return; }
-                // Object.keys devolve chaves numéricas em ordem crescente — aqui
-                // montamos percorrendo o texto, para manter a ordem em que foi colado.
+
+                // Repetidos viram quantidade; a ordem é a da colagem
                 var conta = {};
                 brutos.forEach(function (c) { conta[c] = (conta[c] || 0) + 1; });
                 var unicos = [];
                 brutos.forEach(function (c) { if (unicos.indexOf(c) === -1) unicos.push(c); });
                 var itens = unicos.map(function (c) { return { cod: c, qtd: conta[c] }; });
+
+                // Guarda os códigos para a janela de procedimentos pegar depois
+                try { localStorage.setItem('_assedfCodigos', JSON.stringify(itens)); } catch (e) { }
+                window._assedfCodigos = itens;
 
                 var antigo = document.getElementById('painel-assedf');
                 if (antigo) antigo.remove();
@@ -2192,350 +2196,317 @@
                     'padding:14px;z-index:2147483647;border-radius:8px;font-family:Arial,sans-serif;' +
                     'box-shadow:0 4px 15px rgba(0,0,0,0.6);border:3px solid #4a90d9;font-size:12px;';
                 p.innerHTML = '<h3 style="margin:0 0 8px;color:#9ecbff;text-align:center;">💳 ASSEDF / Vida Card</h3>' +
-                    '<div id="assedf-status" style="font-size:12px;line-height:1.5;white-space:pre-line;background:#12294c;border-radius:5px;padding:8px;min-height:16px;">Iniciando...</div>' +
+                    '<div id="assedf-status" style="font-size:12px;line-height:1.5;white-space:pre-line;background:#12294c;border-radius:5px;padding:8px;min-height:16px;">Guardando os códigos...</div>' +
                     '<button onclick="this.parentElement.remove()" style="width:100%;padding:6px;margin-top:8px;background:#636e72;color:#fff;border:none;border-radius:4px;cursor:pointer;">❌ Fechar</button>';
                 document.body.appendChild(p);
                 var diz = function (t) { document.getElementById('assedf-status').innerText = t; };
 
-                var espera = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
-                var rotulo = function (e) {
-                    return ((e.value || '') + ' ' + (e.textContent || '')).replace(/\s+/g, ' ').trim().toLowerCase();
-                };
+                // ══════════════════════════════════════════════════════════════
+                //  AGENTE — este trecho é colocado DENTRO da janela de
+                //  procedimentos e roda lá, como se fosse parte da página.
+                //  É isso que faz o clique em "Inserir" valer de verdade.
+                // ══════════════════════════════════════════════════════════════
+                var agente = function () {
+                    if (document.getElementById('painel-assedf-agente')) return;
 
-                // Documentos de uma janela, incluindo os quadros dela
-                var docsDe = function (w) {
-                    var l = [];
-                    try { if (!w || w.closed || !w.document) return l; l.push(w.document); } catch (e) { return l; }
-                    try {
-                        Array.from(l[0].querySelectorAll('iframe,frame')).forEach(function (f) {
-                            try { if (f.contentDocument) l.push(f.contentDocument); } catch (e) { }
+                    var lerCodigos = function () {
+                        // 1) entregues direto pelo robô nesta janela
+                        try { if (window.__assedfLista && window.__assedfLista.length) return window.__assedfLista; } catch (e) { }
+                        // 2) guardados no navegador
+                        try {
+                            var g = localStorage.getItem('_assedfCodigos');
+                            if (g) return JSON.parse(g);
+                        } catch (e) { }
+                        // 3) pela janela que abriu esta
+                        try { return (window.opener && window.opener._assedfCodigos) || []; } catch (e) { }
+                        return [];
+                    };
+                    var itens = lerCodigos();
+                    if (!itens.length) return;
+
+                    var caixa = document.createElement('div');
+                    caixa.id = 'painel-assedf-agente';
+                    caixa.style.cssText = 'position:fixed;top:12px;right:12px;z-index:2147483647;width:270px;' +
+                        'background:#1b3a6b;color:#fff;padding:12px;border-radius:8px;font-family:Arial,sans-serif;' +
+                        'font-size:12px;box-shadow:0 6px 20px rgba(0,0,0,.55);border:3px solid #e67e22;';
+                    caixa.innerHTML =
+                        '<div style="font-weight:bold;text-align:center;margin-bottom:8px;color:#ffd9a8;">💳 ASSEDF / Vida Card</div>' +
+                        '<button id="ass-go" style="width:100%;padding:12px;background:#e67e22;color:#fff;border:none;' +
+                        'border-radius:6px;font-weight:bold;cursor:pointer;font-size:14px;">🚀 LIBERAR CÓDIGOS (' + itens.length + ')</button>' +
+                        '<div id="ass-log" style="margin-top:8px;background:#12294c;border-radius:5px;padding:8px;' +
+                        'line-height:1.5;white-space:pre-line;min-height:16px;">Pronto para lançar.</div>' +
+                        '<button id="ass-fechar" style="width:100%;padding:5px;margin-top:6px;background:#636e72;color:#fff;' +
+                        'border:none;border-radius:4px;cursor:pointer;">❌ Fechar</button>';
+                    document.body.appendChild(caixa);
+                    document.getElementById('ass-fechar').onclick = function () { caixa.remove(); };
+
+                    var log = function (t) { document.getElementById('ass-log').innerText = t; };
+                    var espera = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+                    var rot = function (e) {
+                        return ((e.value || '') + ' ' + (e.textContent || '')).replace(/\s+/g, ' ').trim().toLowerCase();
+                    };
+                    var digitaveis = function (raiz) {
+                        return Array.prototype.slice.call(raiz.querySelectorAll('input')).filter(function (e) {
+                            var t = (e.getAttribute('type') || 'text').toLowerCase();
+                            return (t === 'text' || t === '') && !e.disabled && !e.readOnly;
                         });
-                    } catch (e) { }
-                    return l;
-                };
-
-                // ── A linha de lançamento é achada pelo botão "Inserir" ──
-                // Antes eu procurava os títulos das colunas (Procedimento/Qtde) e
-                // não reconhecia a tabela. O "Inserir" é inconfundível e está
-                // sempre na mesma linha dos campos.
-                var digitaveis = function (raiz) {
-                    return Array.from(raiz.querySelectorAll('input')).filter(function (e) {
-                        var t = (e.getAttribute('type') || 'text').toLowerCase();
-                        return (t === 'text' || t === '') && !e.disabled && !e.readOnly;
-                    });
-                };
-
-                var botoesInserir = function (w) {
-                    var todos = [];
-                    docsDe(w).forEach(function (d) {
-                        try {
-                            Array.from(d.querySelectorAll('a,button,input[type=button],input[type=submit]'))
-                                .forEach(function (b) { if (rotulo(b) === 'inserir') todos.push(b); });
-                        } catch (e) { }
-                    });
-                    return todos;
-                };
-
-                var temTela = function (w) { return botoesInserir(w).length > 0; };
-
-                var linhaDe = function (w) {
-                    var bts = botoesInserir(w);
-                    for (var i = 0; i < bts.length; i++) {
-                        var tr = bts[i].closest ? bts[i].closest('tr') : null;
-                        if (!tr) continue;
-                        var ins = digitaveis(tr);
-                        if (!ins.length) continue;
-                        if ((ins[0].value || '').trim()) continue;      // linha já usada
-                        return {
-                            tr: tr, inserir: bts[i], cod: ins[0],
-                            desc: ins.length >= 3 ? ins[1] : null,
-                            qtd: ins.length >= 3 ? ins[2] : (ins.length === 2 ? ins[1] : null)
-                        };
-                    }
-                    return null;
-                };
-
-                // Se não houver linha livre, pode ter sobrado um código de uma
-                // tentativa anterior que não entrou. A linha ainda é editável
-                // (as já inseridas viram texto), então dá para limpar e reusar.
-                var linhaParaUsar = function (w) {
-                    var l = linhaDe(w);
-                    if (l) return l;
-                    var bts = botoesInserir(w);
-                    for (var i = 0; i < bts.length; i++) {
-                        var tr = bts[i].closest ? bts[i].closest('tr') : null;
-                        if (!tr) continue;
-                        var ins = digitaveis(tr);
-                        if (!ins.length) continue;
-                        try {
-                            ins[0].value = '';
-                            if (ins.length >= 3) ins[1].value = '';
-                        } catch (e) { }
-                        return {
-                            tr: tr, inserir: bts[i], cod: ins[0],
-                            desc: ins.length >= 3 ? ins[1] : null,
-                            qtd: ins.length >= 3 ? ins[2] : (ins.length === 2 ? ins[1] : null)
-                        };
-                    }
-                    return null;
-                };
-
-                // ── Clicar em "Inserir" ──
-                // O portal é antigo: o "Inserir" pode ser link, botão ou script.
-                // Tentamos um jeito de cada vez e conferimos se entrou antes de
-                // tentar o próximo — assim nunca inserimos o mesmo exame duas vezes.
-                var entrou = function (w, linha) {
-                    try {
-                        if (linha.cod && linha.cod.isConnected === false) return true;
-                        var nova = linhaDe(w);
-                        if (nova && nova.cod !== linha.cod) return true;
-                    } catch (e) { }
-                    return false;
-                };
-
-                var clicarInserir = async function (w, linha) {
-                    var el = linha.inserir;
-                    var jeitos = [
-                        function () { el.click(); },
-                        function () {
-                            var M = (w && w.MouseEvent) || MouseEvent;
-                            ['mouseover', 'mousedown', 'mouseup', 'click'].forEach(function (t) {
-                                el.dispatchEvent(new M(t, { bubbles: true, cancelable: true }));
-                            });
-                        },
-                        function () { if (typeof el.onclick === 'function') el.onclick(); },
-                        function () {
-                            var h = el.getAttribute && el.getAttribute('href');
-                            if (h && /^javascript:/i.test(h)) w.eval(h.replace(/^javascript:/i, ''));
+                    };
+                    var botoesInserir = function () {
+                        return Array.prototype.slice.call(
+                            document.querySelectorAll('a,button,input[type=button],input[type=submit]'))
+                            .filter(function (b) { return rot(b) === 'inserir'; });
+                    };
+                    var linhaLivre = function (podeLimpar) {
+                        var bts = botoesInserir();
+                        for (var i = 0; i < bts.length; i++) {
+                            var tr = bts[i].closest ? bts[i].closest('tr') : null;
+                            if (!tr) continue;
+                            var ins = digitaveis(tr);
+                            if (!ins.length) continue;
+                            var ocupada = (ins[0].value || '').trim();
+                            if (ocupada && !podeLimpar) continue;
+                            if (ocupada && podeLimpar) {
+                                ins[0].value = '';
+                                if (ins.length >= 3) ins[1].value = '';
+                            }
+                            return {
+                                tr: tr, inserir: bts[i], cod: ins[0],
+                                desc: ins.length >= 3 ? ins[1] : null,
+                                qtd: ins.length >= 3 ? ins[2] : (ins.length === 2 ? ins[1] : null)
+                            };
                         }
-                    ];
-                    for (var j = 0; j < jeitos.length; j++) {
-                        try { jeitos[j](); } catch (e) { }
-                        for (var k = 0; k < 12; k++) {
-                            await espera(250);
-                            if (recusou(w)) return 'recusado';
-                            if (entrou(w, linha)) return 'ok';
+                        return null;
+                    };
+                    var escrever = function (el, v) {
+                        if (!el) return;
+                        try { el.focus(); } catch (e) { }
+                        el.value = v;
+                        try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) { }
+                        try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) { }
+                        try { el.dispatchEvent(new KeyboardEvent('keyup', { bubbles: true })); } catch (e) { }
+                        if (window.jQuery) {
+                            try { window.jQuery(el).val(v).trigger('input').trigger('change').trigger('keyup'); } catch (e) { }
                         }
-                    }
-                    return 'falhou';
-                };
-
-                // ── Encontrar a janela da tela de procedimentos ──
-                var acharJanela = function () {
-                    var lista = [];
-                    try { if (window._assedfJanela) lista.push(window._assedfJanela); } catch (e) { }
-                    try { (window.__crJanelas || []).slice().reverse().forEach(function (w) { lista.push(w); }); } catch (e) { }
-                    lista.push(window);
-                    for (var i = 0; i < lista.length; i++) {
-                        try {
-                            var w = lista[i];
-                            if (!w || w.closed || !w.document) continue;
-                            if (w.document.readyState !== 'complete') continue;
-                            if (temTela(w)) return w;
-                        } catch (e) { }
-                    }
-                    return null;
-                };
-
-                // ── Abrir a tela de procedimentos ──
-                var documentosAqui = function () {
-                    var l = [document];
-                    try {
-                        Array.from(document.querySelectorAll('iframe,frame')).forEach(function (f) {
-                            try { if (f.contentDocument) l.push(f.contentDocument); } catch (e) { }
+                    };
+                    var sair = function (el) {
+                        if (!el) return;
+                        try { el.blur(); } catch (e) { }
+                        ['blur', 'focusout', 'change'].forEach(function (t) {
+                            try { el.dispatchEvent(new Event(t, { bubbles: true })); } catch (e) { }
                         });
-                    } catch (e) { }
-                    return l;
-                };
-
-                var botaoCadastrar = function () {
-                    var achado = null;
-                    documentosAqui().forEach(function (d) {
-                        if (achado) return;
-                        try {
-                            achado = Array.from(d.querySelectorAll('input[type=button],input[type=submit],button,a'))
-                                .find(function (b) { return /cadastrar\s+procedimentos/i.test(rotulo(b)); }) || null;
-                        } catch (e) { }
-                    });
-                    return achado;
-                };
-
-                var enderecoTela = function () {
-                    var t = '';
-                    try {
-                        var bt = botaoCadastrar();
-                        if (bt) t += ' ' + (bt.getAttribute('href') || '') + ' ' + (bt.getAttribute('onclick') || '');
-                        documentosAqui().forEach(function (d) {
-                            try {
-                                Array.from(d.querySelectorAll('[onclick],a[href],form[action]')).forEach(function (e) {
-                                    t += ' ' + (e.getAttribute('onclick') || '') + ' ' +
-                                         (e.getAttribute('href') || '') + ' ' + (e.getAttribute('action') || '');
+                        if (window.jQuery) { try { window.jQuery(el).trigger('blur').trigger('change'); } catch (e) { } }
+                    };
+                    var recusou = function () {
+                        var t = document.body ? (document.body.innerText || document.body.textContent || '') : '';
+                        return /procedimento\s+n[ãa]o\s+autorizado/i.test(t);
+                    };
+                    var limparAviso = function () {
+                        var todos = document.querySelectorAll('*');
+                        for (var i = 0; i < todos.length; i++) {
+                            if (todos[i].children.length === 0 &&
+                                /procedimento\s+n[ãa]o\s+autorizado/i.test(todos[i].textContent || '')) {
+                                todos[i].textContent = '';
+                            }
+                        }
+                    };
+                    // Aciona o "Inserir" e confere se entrou antes de tentar outro
+                    // jeito — assim nunca lança o mesmo exame duas vezes.
+                    var acionar = async function (linha) {
+                        var el = linha.inserir;
+                        var jeitos = [
+                            function () { el.click(); },
+                            function () {
+                                ['mouseover', 'mousedown', 'mouseup', 'click'].forEach(function (t) {
+                                    el.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window }));
                                 });
-                                Array.from(d.querySelectorAll('script')).forEach(function (sc) {
-                                    if (!sc.src) t += ' ' + (sc.textContent || '');
-                                });
-                            } catch (e) { }
-                        });
-                    } catch (e) { }
-                    var m = t.match(/[^'"\s(),]*GPSC0005b\.php[^'"\s(),]*/i);
-                    if (!m) return null;
-                    try { return new URL(m[0], document.baseURI).href; } catch (e) { return m[0]; }
-                };
-
-                var abrirTela = function () {
-                    var bt = botaoCadastrar();
-                    if (bt) {
-                        try { bt.click(); } catch (e) { }
-                        return 'botão';
-                    }
-                    var url = enderecoTela();
-                    if (url) {
-                        try {
-                            var w = window.open(url, 'crAssedfProc', 'width=1050,height=750,scrollbars=yes,resizable=yes');
-                            if (w) { window._assedfJanela = w; return 'endereço'; }
-                        } catch (e) { }
-                    }
-                    return null;
-                };
-
-                var escrever = function (el, v) {
-                    if (!el) return;
-                    try { el.focus(); } catch (e) { }
-                    try {
-                        var w2 = el.ownerDocument.defaultView || window;
-                        var d2 = Object.getOwnPropertyDescriptor(w2.HTMLInputElement.prototype, 'value');
-                        if (d2 && d2.set) d2.set.call(el, String(v)); else el.value = v;
-                    } catch (e) { el.value = v; }
-                    el.dispatchEvent(new Event('input', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                };
-                var sairDoCampo = function (el) {          // "clicar fora" traz o nome do exame
-                    if (!el) return;
-                    try { el.blur(); } catch (e) { }
-                    el.dispatchEvent(new Event('blur', { bubbles: true }));
-                    el.dispatchEvent(new Event('focusout', { bubbles: true }));
-                    el.dispatchEvent(new Event('change', { bubbles: true }));
-                };
-
-                var recusou = function (w) {
-                    var achou = false;
-                    docsDe(w).forEach(function (d) {
-                        try {
-                            var t = d.body ? (d.body.innerText || d.body.textContent || '') : '';
-                            if (/procedimento\s+n[ãa]o\s+autorizado/i.test(t)) achou = true;
-                        } catch (e) { }
-                    });
-                    return achou;
-                };
-                var limparAviso = function (w) {
-                    docsDe(w).forEach(function (d) {
-                        try {
-                            Array.from(d.querySelectorAll('*')).forEach(function (e) {
-                                if (e.children.length === 0 && /procedimento\s+n[ãa]o\s+autorizado/i.test(e.textContent || '')) {
-                                    e.textContent = '';
-                                }
-                            });
-                        } catch (e) { }
-                    });
-                };
-
-                (async function () {
-                    // ── ETAPA 1: a tela ainda não está aberta ──
-                    var jan = acharJanela();
-                    if (!jan) {
-                        diz('🪟 Abrindo a tela de procedimentos...');
-                        var como = abrirTela();
-                        if (!como) {
-                            diz('❌ Não achei o botão "Cadastrar Procedimentos".\n' +
-                                'Clique em Verificar e depois em Gravar antes de iniciar.\n(Concluído)');
-                            return;
+                            },
+                            function () { if (typeof el.onclick === 'function') el.onclick.call(el); },
+                            function () {
+                                var h = el.getAttribute && el.getAttribute('href');
+                                if (h && /^javascript:/i.test(h)) eval(h.replace(/^javascript:/i, ''));
+                            },
+                            function () { if (window.jQuery) window.jQuery(el).trigger('click'); }
+                        ];
+                        for (var j = 0; j < jeitos.length; j++) {
+                            try { jeitos[j](); } catch (e) { }
+                            for (var k = 0; k < 12; k++) {
+                                await espera(250);
+                                if (recusou()) return 'recusado';
+                                try { if (linha.cod.isConnected === false) return 'ok'; } catch (e) { }
+                                var nova = linhaLivre(false);
+                                if (nova && nova.cod !== linha.cod) return 'ok';
+                            }
                         }
-                        for (var k = 0; k < 24; k++) {
-                            await espera(500);
-                            jan = acharJanela();
-                            if (jan) break;
-                        }
-                        if (jan) window._assedfJanela = jan;
-                        // O "✅" avisa o app que esta etapa acabou, para o botão
-                        // voltar a ser INICIAR (senão o próximo clique vira PARAR).
-                        diz('✅ Tela de procedimentos aberta.\n\n' +
-                            '➡️ Agora clique em INICIAR AUTOMAÇÃO de novo\n' +
-                            'para eu lançar os ' + itens.length + ' código(s).');
-                        return;
-                    }
+                        return 'falhou';
+                    };
 
-                    // ── ETAPA 2: a tela está aberta — lançar os códigos ──
-                    window._assedfJanela = jan;
-                    var lancados = 0, recusados = [], parouPor = null;
+                    document.getElementById('ass-go').onclick = async function () {
+                        var b = document.getElementById('ass-go');
+                        itens = lerCodigos();
+                        b.disabled = true;
+                        b.style.background = '#c0392b';
+                        b.innerText = '⏳ Lançando...';
 
-                    for (var i = 0; i < itens.length; i++) {
-                        if (!jan || jan.closed) { diz('❌ A tela de procedimentos foi fechada.'); return; }
-                        var cod = itens[i].cod, qtd = itens[i].qtd;
-                        diz('⏳ ' + (i + 1) + '/' + itens.length + ' — código ' + cod +
-                            (qtd > 1 ? ' (quantidade ' + qtd + ')' : ''));
+                        var lancados = 0, recusados = [], parou = null;
+                        for (var i = 0; i < itens.length; i++) {
+                            var cod = itens[i].cod, qtd = itens[i].qtd;
+                            log('⏳ ' + (i + 1) + '/' + itens.length + ' — ' + cod + (qtd > 1 ? ' (qtd ' + qtd + ')' : ''));
 
-                        var linha = null;
-                        for (var t = 0; t < 40; t++) {
-                            linha = linhaParaUsar(jan);
-                            if (linha) break;
-                            await espera(300);
-                        }
-                        if (!linha) { parouPor = 'não apareceu linha para preencher (código ' + cod + ')'; break; }
+                            var linha = null;
+                            for (var t = 0; t < 40; t++) {
+                                linha = linhaLivre(t > 8);
+                                if (linha) break;
+                                await espera(300);
+                            }
+                            if (!linha) { parou = 'não apareceu linha para o código ' + cod; break; }
 
-                        escrever(linha.cod, cod);
-                        sairDoCampo(linha.cod);
+                            escrever(linha.cod, cod);
+                            sair(linha.cod);
 
-                        var nome = '';
-                        for (var w2 = 0; w2 < 40; w2++) {
-                            try {
+                            var nome = '';
+                            for (var w = 0; w < 40; w++) {
                                 if (linha.desc && (linha.desc.value || '').trim().length > 2) {
                                     nome = linha.desc.value.trim(); break;
                                 }
-                                var td = linha.tr.cells;
-                                if (td) {
-                                    for (var c2 = 0; c2 < td.length; c2++) {
-                                        var tt = (td[c2].textContent || '').replace(/\s+/g, ' ').trim();
-                                        if (tt.length > 4 && !/^\d+$/.test(tt) && !/inserir|zerar/i.test(tt)) { nome = tt; break; }
-                                    }
-                                    if (nome) break;
-                                }
-                            } catch (e) { }
-                            await espera(250);
+                                await espera(250);
+                            }
+
+                            if (linha.qtd) { escrever(linha.qtd, qtd); sair(linha.qtd); await espera(200); }
+
+                            limparAviso();
+                            var res = await acionar(linha);
+
+                            if (res === 'recusado') {
+                                recusados.push(nome || cod);
+                                limparAviso();
+                                var atual = linhaLivre(true);
+                                if (atual) { escrever(atual.cod, ''); if (atual.desc) escrever(atual.desc, ''); }
+                                log('⚠️ ' + (nome || cod) + ' não entrou — seguindo para o próximo');
+                                await espera(500);
+                            } else if (res === 'falhou') {
+                                parou = 'o botão "Inserir" não respondeu no código ' + cod;
+                                break;
+                            } else {
+                                lancados++;
+                            }
                         }
 
-                        if (linha.qtd) { escrever(linha.qtd, qtd); sairDoCampo(linha.qtd); await espera(200); }
-
-                        limparAviso(jan);
-                        var res = await clicarInserir(jan, linha);
-
-                        if (res === 'recusado') {
-                            recusados.push(nome || cod);
-                            limparAviso(jan);
-                            try {
-                                var atual = linhaDe(jan) || linha;
-                                escrever(atual.cod, '');
-                                if (atual.desc) escrever(atual.desc, '');
-                            } catch (e) { }
-                            diz('⚠️ ' + (nome || cod) + ' não entrou — seguindo para o próximo');
-                            await espera(600);
-                        } else if (res === 'falhou') {
-                            parouPor = 'o botão "Inserir" não respondeu no código ' + cod;
-                            break;
-                        } else {
-                            lancados++;
+                        var fim = (parou ? '⚠️ Parei: ' + parou + '\n' : '✅ Concluído! ') +
+                                  lancados + ' de ' + itens.length + ' exame(s) lançado(s).';
+                        if (recusados.length) {
+                            fim += '\n⚠️ ' + recusados.join(', ') +
+                                   (recusados.length > 1 ? ' não entraram' : ' não entrou') +
+                                   ' devido paciente ter realizado recente';
                         }
-                    }
+                        fim += '\nConfira e clique em Gravar.';
+                        log(fim);
+                        b.disabled = false;
+                        b.style.background = parou ? '#e67e22' : '#27ae60';
+                        b.innerText = parou ? '🔁 Tentar de novo' : '✅ Concluído';
+                    };
+                };
 
-                    var fim = (parouPor ? '⚠️ Parei: ' + parouPor + '\n' : '✅ Concluído! ') +
-                              lancados + ' de ' + itens.length + ' exame(s) lançado(s).';
-                    if (recusados.length) {
-                        fim += '\n⚠️ ' + recusados.join(', ') +
-                               (recusados.length > 1 ? ' não entraram' : ' não entrou') +
-                               ' devido paciente ter realizado recente';
+                // ── Colocar o agente dentro da janela de procedimentos ──
+                var temTelaProc = function (d) {
+                    try {
+                        return Array.prototype.slice.call(
+                            d.querySelectorAll('a,button,input[type=button],input[type=submit]'))
+                            .some(function (b) {
+                                return ((b.value || '') + ' ' + (b.textContent || ''))
+                                    .replace(/\s+/g, ' ').trim().toLowerCase() === 'inserir';
+                            });
+                    } catch (e) { return false; }
+                };
+
+                var injetar = function (w) {
+                    try {
+                        if (!w || w.closed || !w.document || !w.document.body) return false;
+                        var d = w.document;
+                        if (d.getElementById('painel-assedf-agente')) return true;
+                        if (!temTelaProc(d)) return false;
+                        // Entrega a lista dentro da janela (nem sempre dá para ler
+                        // o armazenamento do navegador ou a janela de origem)
+                        try { w.__assedfLista = JSON.parse(JSON.stringify(itens)); } catch (e) { }
+                        try { w.eval('window.__assedfLista = ' + JSON.stringify(itens) + ';'); } catch (e) { }
+                        var sc = d.createElement('script');
+                        sc.textContent = '(' + agente.toString() + ')();';
+                        d.body.appendChild(sc);
+                        return !!d.getElementById('painel-assedf-agente');
+                    } catch (e) { return false; }
+                };
+
+                // Relógio próprio: o app troca os relógios da página durante a
+                // automação, e este vigia precisa sobreviver a isso.
+                var relogioProprio = (function () {
+                    try {
+                        var f = document.createElement('iframe');
+                        f.style.cssText = 'position:fixed;left:-9999px;width:1px;height:1px;border:0;';
+                        document.body.appendChild(f);
+                        var jan = f.contentWindow;
+                        return function (fn, ms) { return jan.setInterval(fn, ms); };
+                    } catch (e) {
+                        return function (fn, ms) { return setInterval(fn, ms); };
                     }
-                    fim += '\nConfira na tela e clique em Gravar.\n(automação finalizada)';
-                    diz(fim);
                 })();
+
+                // Fica de olho em toda janela que a página abrir
+                var alvos = [];
+                var lembrar = function (w) { if (w && alvos.indexOf(w) === -1) alvos.push(w); };
+                [window, window.top, window.parent].forEach(function (alvo) {
+                    try {
+                        if (!alvo || alvo.__assedfHook) return;
+                        var orig = alvo.open;
+                        alvo.open = function () { var w = orig.apply(alvo, arguments); lembrar(w); return w; };
+                        alvo.__assedfHook = true;
+                    } catch (e) { }
+                });
+
+                // Links e formulários com destino não passam pelo window.open:
+                // damos um nome conhecido a eles no momento do clique.
+                var marcouNome = false, tentativasNome = 0;
+                try {
+                    document.addEventListener('click', function (e) {
+                        try {
+                            var el = e.target && e.target.closest ? e.target.closest('a,input,button') : null;
+                            if (!el) return;
+                            var t = ((el.value || '') + ' ' + (el.textContent || '')).replace(/\s+/g, ' ').trim();
+                            if (!/cadastrar\s+procedimentos/i.test(t)) return;
+                            if (el.tagName === 'A' && el.getAttribute('target')) {
+                                el.setAttribute('target', 'crAssedfProc'); marcouNome = true;
+                            }
+                            var f = el.form || (el.closest && el.closest('form'));
+                            if (f && f.target) { f.target = 'crAssedfProc'; marcouNome = true; }
+                        } catch (e2) { }
+                    }, true);
+                } catch (e) { }
+
+                var voltas = 0;
+                var vigia = relogioProprio(function () {
+                    voltas++;
+                    if (voltas > 2400) { try { clearInterval(vigia); } catch (e) { } return; }   // ~36 min
+                    var lista = alvos.slice();
+                    try { (window.__crJanelas || []).forEach(function (w) { lista.push(w); }); } catch (e) { }
+                    if (marcouNome && tentativasNome < 8) {
+                        tentativasNome++;
+                        try {
+                            var w2 = window.open('', 'crAssedfProc');
+                            if (w2 && w2 !== window) {
+                                lista.push(w2);
+                                try {
+                                    var vazia = (w2.location.href === 'about:blank') &&
+                                        (!w2.document || !w2.document.body || !(w2.document.body.innerHTML || '').trim());
+                                    if (vazia) w2.close();
+                                } catch (e3) { }
+                            }
+                        } catch (e) { }
+                    }
+                    for (var i = 0; i < lista.length; i++) injetar(lista[i]);
+                }, 900);
+
+                diz('✅ ' + itens.length + ' código(s) guardado(s) na memória.\n\n' +
+                    '➡️ Agora clique em "Cadastrar Procedimentos".\n' +
+                    'Na janela que abrir vai aparecer o botão laranja\n' +
+                    '"LIBERAR CÓDIGOS" — clique nele para lançar.');
             })();
         },
         "ASSEFAZ": () => {
