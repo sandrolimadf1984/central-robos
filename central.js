@@ -2208,6 +2208,7 @@
                 // ══════════════════════════════════════════════════════════════
                 var agente = function () {
                     if (document.getElementById('painel-assedf-agente')) return;
+                    try { if (window.__assedfFechado) return; } catch (e) { }
 
                     var lerCodigos = function () {
                         // 1) entregues direto pelo robô nesta janela
@@ -2238,7 +2239,11 @@
                         '<button id="ass-fechar" style="width:100%;padding:5px;margin-top:6px;background:#636e72;color:#fff;' +
                         'border:none;border-radius:4px;cursor:pointer;">❌ Fechar</button>';
                     document.body.appendChild(caixa);
-                    document.getElementById('ass-fechar').onclick = function () { caixa.remove(); };
+                    document.getElementById('ass-fechar').onclick = function () {
+                        // marca que o atendente fechou, senão a vigia reabre a caixinha
+                        try { window.__assedfFechado = true; } catch (e) { }
+                        caixa.remove();
+                    };
 
                     var log = function (t) { document.getElementById('ass-log').innerText = t; };
                     var espera = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
@@ -2367,46 +2372,105 @@
                     };
                     // Aciona o "Inserir" e confere se entrou antes de tentar outro
                     // jeito — assim nunca lança o mesmo exame duas vezes.
-                    var acionar = async function (linha) {
-                        var el = linha.inserir;
-                        // Se o "Inserir" for texto dentro de um link ou botão,
-                        // quem responde ao clique é o elemento de fora.
+                    // Como saber que o exame ENTROU: depois de inserido, o código
+                    // passa a aparecer como TEXTO na tela (antes ele só existia
+                    // dentro do campo de digitação). Esse sinal é o mais confiável.
+                    var textoDaTela = function () {
+                        var t = '';
+                        docs().forEach(function (d) {
+                            try { t += ' ' + (d.body ? (d.body.innerText || d.body.textContent || '') : ''); } catch (e) { }
+                        });
+                        return t;
+                    };
+                    var entrou = function (linha, cod, jaEstava) {
                         try {
-                            var pai = el.closest && el.closest('a,button,input[type=button],input[type=submit]');
-                            if (pai && pai !== el) el = pai;
+                            if (!jaEstava && textoDaTela().indexOf(cod) !== -1) return true;
+                            if (linha.cod && linha.cod.isConnected === false) return true;
+                            if (linha.cod && !(linha.cod.value || '').trim()) return true;
+                            var nova = linhaLivre(false);
+                            if (nova && nova.cod !== linha.cod) return true;
                         } catch (e) { }
-                        var dono = el.ownerDocument || document;
+                        return false;
+                    };
+
+                    // Descreve o botão — se nada funcionar, isso aparece no aviso e
+                    // diz exatamente com o que estamos lidando.
+                    var descrever = function (el) {
+                        try {
+                            var a = [];
+                            ['href', 'onclick', 'name', 'id', 'class', 'type', 'value'].forEach(function (n) {
+                                var v = el.getAttribute && el.getAttribute(n);
+                                if (v) a.push(n + '="' + String(v).slice(0, 60) + '"');
+                            });
+                            return el.tagName + (a.length ? ' ' + a.join(' ') : '');
+                        } catch (e) { return '?'; }
+                    };
+
+                    var acionar = async function (linha, cod) {
+                        var base = linha.inserir;
+                        try {
+                            var p2 = base.closest && base.closest('a,button,input[type=button],input[type=submit]');
+                            if (p2 && p2 !== base) base = p2;
+                        } catch (e) { }
+                        var dono = base.ownerDocument || document;
                         var vista = dono.defaultView || window;
-                        var jeitos = [
-                            function () { el.click(); },
-                            function () {
-                                // Elementos que não são botão (span, td) só respondem
-                                // ao evento de clique da própria janela deles
-                                var M = vista.MouseEvent || MouseEvent;
-                                ['mouseover', 'mousedown', 'mouseup', 'click'].forEach(function (t) {
-                                    el.dispatchEvent(new M(t, { bubbles: true, cancelable: true, view: vista }));
-                                });
-                            },
-                            function () {
-                                ['mouseover', 'mousedown', 'mouseup', 'click'].forEach(function (t) {
-                                    el.dispatchEvent(new MouseEvent(t, { bubbles: true, cancelable: true, view: window }));
-                                });
-                            },
-                            function () { if (typeof el.onclick === 'function') el.onclick.call(el); },
-                            function () {
+                        var jaEstava = textoDaTela().indexOf(cod) !== -1;
+
+                        // O tratador do clique pode estar no próprio elemento, na
+                        // célula ou na linha — acionamos todos os níveis.
+                        var niveis = [], p3 = base;
+                        for (var n = 0; n < 5 && p3; n++) {
+                            niveis.push(p3);
+                            if (p3.tagName === 'TR') break;
+                            p3 = p3.parentElement;
+                        }
+
+                        var disparar = function (el) {
+                            var M = vista.MouseEvent || MouseEvent;
+                            ['mouseover', 'mousedown', 'mouseup', 'click'].forEach(function (t) {
+                                try { el.dispatchEvent(new M(t, { bubbles: true, cancelable: true, view: vista })); } catch (e) { }
+                            });
+                        };
+                        var rodarScript = function (el) {
+                            try {
                                 var h = el.getAttribute && el.getAttribute('href');
-                                if (h && /^javascript:/i.test(h)) eval(h.replace(/^javascript:/i, ''));
-                            },
-                            function () { if (window.jQuery) window.jQuery(el).trigger('click'); }
-                        ];
+                                if (h && /^javascript:/i.test(h)) { vista.eval(h.replace(/^javascript:/i, '')); return; }
+                            } catch (e) { }
+                            try {
+                                var oc = el.getAttribute && el.getAttribute('onclick');
+                                if (oc) vista.eval(oc);
+                            } catch (e) { }
+                        };
+
+                        var jeitos = [];
+                        niveis.forEach(function (el) {
+                            jeitos.push(function () { if (typeof el.click === 'function') el.click(); });
+                            jeitos.push(function () { disparar(el); });
+                            jeitos.push(function () { if (typeof el.onclick === 'function') el.onclick.call(el); });
+                            jeitos.push(function () { rodarScript(el); });
+                        });
+                        jeitos.push(function () { if (vista.jQuery) vista.jQuery(base).trigger('click'); });
+                        jeitos.push(function () {                       // Enter no campo
+                            var alvo = linha.qtd || linha.cod;
+                            if (!alvo) return;
+                            var K = vista.KeyboardEvent || KeyboardEvent;
+                            ['keydown', 'keypress', 'keyup'].forEach(function (t) {
+                                try { alvo.dispatchEvent(new K(t, { key: 'Enter', keyCode: 13, which: 13, bubbles: true })); } catch (e) { }
+                            });
+                        });
+                        jeitos.push(function () {                       // envia o formulário
+                            try {
+                                var f = base.form || (base.closest && base.closest('form'));
+                                if (f && typeof f.submit === 'function') f.submit();
+                            } catch (e) { }
+                        });
+
                         for (var j = 0; j < jeitos.length; j++) {
                             try { jeitos[j](); } catch (e) { }
-                            for (var k = 0; k < 12; k++) {
-                                await espera(250);
+                            for (var k = 0; k < 6; k++) {
+                                await espera(220);
                                 if (recusou()) return 'recusado';
-                                try { if (linha.cod.isConnected === false) return 'ok'; } catch (e) { }
-                                var nova = linhaLivre(false);
-                                if (nova && nova.cod !== linha.cod) return 'ok';
+                                if (entrou(linha, cod, jaEstava)) return 'ok';
                             }
                         }
                         return 'falhou';
@@ -2440,18 +2504,27 @@
                             escrever(linha.cod, cod);
                             sair(linha.cod);
 
+                            // O nome do exame pode vir num campo OU como texto na
+                            // linha (no portal ele aparece como link azul).
                             var nome = '';
                             for (var w = 0; w < 40; w++) {
                                 if (linha.desc && (linha.desc.value || '').trim().length > 2) {
                                     nome = linha.desc.value.trim(); break;
                                 }
+                                var bruto = (linha.tr.innerText || linha.tr.textContent || '')
+                                    .replace(/\s+/g, ' ').trim();
+                                var limpo = bruto.split(cod).join(' ')
+                                    .replace(/\b(inserir|zerar|inclui[r]?|excluir)\b/gi, ' ')
+                                    .replace(/(^|\s)P(\s|$)/g, ' ')
+                                    .replace(/\s+/g, ' ').trim();
+                                if (limpo.length > 4) { nome = limpo; break; }
                                 await espera(250);
                             }
 
                             if (linha.qtd) { escrever(linha.qtd, qtd); sair(linha.qtd); await espera(200); }
 
                             limparAviso();
-                            var res = await acionar(linha);
+                            var res = await acionar(linha, cod);
 
                             if (res === 'recusado') {
                                 recusados.push(nome || cod);
@@ -2461,7 +2534,8 @@
                                 log('⚠️ ' + (nome || cod) + ' não entrou — seguindo para o próximo');
                                 await espera(500);
                             } else if (res === 'falhou') {
-                                parou = 'o botão "Inserir" não respondeu no código ' + cod;
+                                parou = 'o botão "Inserir" não respondeu no código ' + cod +
+                                        '\n[' + descrever(linha.inserir) + ']';
                                 break;
                             } else {
                                 lancados++;
@@ -2506,6 +2580,7 @@
                         if (!w || w.closed || !w.document || !w.document.body) return false;
                         var d = w.document;
                         if (d.getElementById('painel-assedf-agente')) return true;
+                        try { if (w.__assedfFechado) return true; } catch (e) { }
                         if (!ehJanelaDoConvenio(w)) return false;
                         // Entrega a lista dentro da janela (nem sempre dá para ler
                         // o armazenamento do navegador ou a janela de origem)
