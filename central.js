@@ -2185,7 +2185,10 @@
                 var itens = unicos.map(function (c) { return { cod: c, qtd: conta[c] }; });
 
                 // Guarda os códigos para a janela de procedimentos pegar depois
-                try { localStorage.setItem('_assedfCodigos', JSON.stringify(itens)); } catch (e) { }
+                try {
+                    localStorage.setItem('_assedfCodigos', JSON.stringify(itens));
+                    localStorage.removeItem('_assedfFeitos');   // lote novo, contagem nova
+                } catch (e) { }
                 window._assedfCodigos = itens;
 
                 var antigo = document.getElementById('painel-assedf');
@@ -2246,6 +2249,31 @@
                     };
 
                     var log = function (t) { document.getElementById('ass-log').innerText = t; };
+
+                    // Se a função do portal recarregar a tela, o ajudante morre junto.
+                    // Por isso anotamos o que já entrou: ao voltar, ele pula esses.
+                    var jaFeitos = function () {
+                        try { return JSON.parse(localStorage.getItem('_assedfFeitos') || '[]'); }
+                        catch (e) { return []; }
+                    };
+                    var anotarFeito = function (cod) {
+                        try {
+                            var l = jaFeitos();
+                            if (l.indexOf(cod) === -1) l.push(cod);
+                            localStorage.setItem('_assedfFeitos', JSON.stringify(l));
+                        } catch (e) { }
+                    };
+                    var desanotar = function (cod) {
+                        try {
+                            var l = jaFeitos().filter(function (c) { return c !== cod; });
+                            localStorage.setItem('_assedfFeitos', JSON.stringify(l));
+                        } catch (e) { }
+                    };
+                    var zerarFeitos = function () {
+                        try { localStorage.removeItem('_assedfFeitos'); } catch (e) { }
+                    };
+
+
                     var espera = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
                     var rot = function (e) {
                         return ((e.value || '') + ' ' + (e.textContent || '')).replace(/\s+/g, ' ').trim().toLowerCase();
@@ -2268,6 +2296,36 @@
                         } catch (e) { }
                         return l;
                     };
+                    // A função inserir() do portal pode parar por dois motivos que
+                    // não aparecem na tela: uma caixa de aviso que ninguém fecha, ou
+                    // um pop-up bloqueado pelo navegador. Aqui desarmamos os dois e
+                    // guardamos a mensagem, que é o que faltava para entender a falha.
+                    var avisos = [], errosJS = [];
+                    var instalarEscudo = function () {
+                        docs().forEach(function (d) {
+                            var v = d.defaultView;
+                            if (!v) return;
+                            try {
+                                if (v.__assedfEscudo) return;
+                                var abrirOrig = v.open;
+                                v.alert = function (m) { avisos.push(String(m)); };
+                                v.confirm = function (m) { avisos.push(String(m)); return true; };
+                                v.open = function () {
+                                    try { var w = abrirOrig.apply(v, arguments); if (w) return w; } catch (e) { }
+                                    // pop-up bloqueado: devolvemos algo inofensivo para
+                                    // o portal não quebrar no meio do lançamento
+                                    return { closed: false, focus: function () { }, close: function () { },
+                                             document: { write: function () { }, close: function () { } },
+                                             location: { href: '' } };
+                                };
+                                v.addEventListener('error', function (e) {
+                                    errosJS.push((e && e.message) || 'erro');
+                                });
+                                v.__assedfEscudo = true;
+                            } catch (e) { }
+                        });
+                    };
+
                     var botoesInserir = function () {
                         var out = [];
                         docs().forEach(function (d) {
@@ -2449,6 +2507,14 @@
                             jeitos.push(function () { if (typeof el.onclick === 'function') el.onclick.call(el); });
                             jeitos.push(function () { rodarScript(el); });
                         });
+                        jeitos.push(function () {
+                            // Executa o comando do botão como o navegador executaria,
+                            // com o próprio botão no lugar do "this"
+                            var oc = base.getAttribute && base.getAttribute('onclick');
+                            if (!oc) return;
+                            var F = vista.Function || Function;
+                            (new F('event', oc)).call(base, null);
+                        });
                         jeitos.push(function () { if (vista.jQuery) vista.jQuery(base).trigger('click'); });
                         jeitos.push(function () {                       // Enter no campo
                             var alvo = linha.qtd || linha.cod;
@@ -2466,7 +2532,8 @@
                         });
 
                         for (var j = 0; j < jeitos.length; j++) {
-                            try { jeitos[j](); } catch (e) { }
+                            instalarEscudo();
+                            try { jeitos[j](); } catch (e) { errosJS.push(e.message || 'erro'); }
                             for (var k = 0; k < 6; k++) {
                                 await espera(220);
                                 if (recusou()) return 'recusado';
@@ -2477,6 +2544,7 @@
                     };
 
                     document.getElementById('ass-go').onclick = async function () {
+                        instalarEscudo();
                         var b = document.getElementById('ass-go');
                         itens = lerCodigos();
                         b.disabled = true;
@@ -2484,8 +2552,18 @@
                         b.innerText = '⏳ Lançando...';
 
                         var lancados = 0, recusados = [], parou = null;
+                        var feitos = jaFeitos();
                         for (var i = 0; i < itens.length; i++) {
                             var cod = itens[i].cod, qtd = itens[i].qtd;
+
+                            // já entrou antes (ou já está na tela): não repete
+                            if (feitos.indexOf(cod) !== -1 || textoDaTela().indexOf(cod) !== -1) {
+                                lancados++;
+                                log('↷ ' + (i + 1) + '/' + itens.length + ' — ' + cod + ' já estava lançado');
+                                await espera(120);
+                                continue;
+                            }
+
                             log('⏳ ' + (i + 1) + '/' + itens.length + ' — ' + cod + (qtd > 1 ? ' (qtd ' + qtd + ')' : ''));
 
                             var linha = null;
@@ -2524,9 +2602,13 @@
                             if (linha.qtd) { escrever(linha.qtd, qtd); sair(linha.qtd); await espera(200); }
 
                             limparAviso();
+                            // Anotamos ANTES de acionar: se a tela recarregar no meio
+                            // do processo, o ajudante volta sabendo que este já foi.
+                            anotarFeito(cod);
                             var res = await acionar(linha, cod);
 
                             if (res === 'recusado') {
+                                desanotar(cod);          // não entrou: pode tentar de novo
                                 recusados.push(nome || cod);
                                 limparAviso();
                                 var atual = linhaLivre(true);
@@ -2534,8 +2616,11 @@
                                 log('⚠️ ' + (nome || cod) + ' não entrou — seguindo para o próximo');
                                 await espera(500);
                             } else if (res === 'falhou') {
+                                desanotar(cod);
                                 parou = 'o botão "Inserir" não respondeu no código ' + cod +
                                         '\n[' + descrever(linha.inserir) + ']';
+                                if (avisos.length) parou += '\nO portal avisou: ' + avisos.slice(-3).join(' | ');
+                                if (errosJS.length) parou += '\nErro na página: ' + errosJS.slice(-3).join(' | ');
                                 break;
                             } else {
                                 lancados++;
@@ -2550,6 +2635,7 @@
                                    ' devido paciente ter realizado recente';
                         }
                         fim += '\nConfira e clique em Gravar.';
+                        if (!parou) zerarFeitos();
                         log(fim);
                         b.disabled = false;
                         b.style.background = parou ? '#e67e22' : '#27ae60';
