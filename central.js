@@ -2300,7 +2300,7 @@
                     // não aparecem na tela: uma caixa de aviso que ninguém fecha, ou
                     // um pop-up bloqueado pelo navegador. Aqui desarmamos os dois e
                     // guardamos a mensagem, que é o que faltava para entender a falha.
-                    var avisos = [], errosJS = [];
+                    var avisos = [], errosJS = [], acoes = [];
                     var instalarEscudo = function () {
                         docs().forEach(function (d) {
                             var v = d.defaultView;
@@ -2321,6 +2321,33 @@
                                 v.addEventListener('error', function (e) {
                                     errosJS.push((e && e.message) || 'erro');
                                 });
+
+                                // Registra o que a função do portal faz por dentro.
+                                // Se ela nem chega a enviar nada, é porque está
+                                // desistindo no meio — e isso muda o tratamento.
+                                try {
+                                    var protoF = v.HTMLFormElement && v.HTMLFormElement.prototype;
+                                    if (protoF && !protoF.__assedfEspiao) {
+                                        var envOrig = protoF.submit;
+                                        protoF.submit = function () {
+                                            acoes.push('enviou o formulário' + (this.name ? ' ' + this.name : ''));
+                                            return envOrig.apply(this, arguments);
+                                        };
+                                        protoF.__assedfEspiao = true;
+                                    }
+                                } catch (e) { }
+                                try {
+                                    var protoX = v.XMLHttpRequest && v.XMLHttpRequest.prototype;
+                                    if (protoX && !protoX.__assedfEspiao) {
+                                        var abrirX = protoX.open;
+                                        protoX.open = function (m2, u2) {
+                                            acoes.push('chamou o servidor: ' + String(u2).slice(0, 70));
+                                            return abrirX.apply(this, arguments);
+                                        };
+                                        protoX.__assedfEspiao = true;
+                                    }
+                                } catch (e) { }
+
                                 v.__assedfEscudo = true;
                             } catch (e) { }
                         });
@@ -2453,6 +2480,21 @@
 
                     // Descreve o botão — se nada funcionar, isso aparece no aviso e
                     // diz exatamente com o que estamos lidando.
+                    // Lê o código-fonte da função que o portal chama. É a
+                    // informação que permite reproduzir exatamente o que ela faz.
+                    var fonteDaFuncao = function (el) {
+                        try {
+                            var oc = el.getAttribute && el.getAttribute('onclick');
+                            if (!oc) return '';
+                            var m = oc.match(/([A-Za-z_$][\w$]*)\s*\(/);
+                            if (!m) return '';
+                            var v = (el.ownerDocument && el.ownerDocument.defaultView) || window;
+                            var fn = v[m[1]];
+                            if (typeof fn !== 'function') return m[1] + '() NÃO EXISTE nesta janela';
+                            return String(fn).replace(/\s+/g, ' ').slice(0, 500);
+                        } catch (e) { return ''; }
+                    };
+
                     var descrever = function (el) {
                         try {
                             var a = [];
@@ -2530,6 +2572,62 @@
                         };
 
                         var jeitos = [function () { cliqueRealista(base, vista); }];
+
+                        // ── Chamar a função do portal diretamente, com o "event"
+                        // montado. Portais dessa época leem window.event.srcElement
+                        // para saber qual linha inserir; sem isso, desistem calados.
+                        jeitos.push(function () {
+                            var oc = base.getAttribute && base.getAttribute('onclick');
+                            if (!oc) return;
+                            var m = oc.match(/([A-Za-z_$][\w$]*)\s*\(/);
+                            if (!m) return;
+                            var fn = vista[m[1]];
+                            if (typeof fn !== 'function') return;
+                            var ev = null;
+                            try {
+                                ev = new (vista.MouseEvent || MouseEvent)('click', { bubbles: true, view: vista });
+                                try { Object.defineProperty(ev, 'target', { value: base, configurable: true }); } catch (e) { }
+                                try { Object.defineProperty(ev, 'srcElement', { value: base, configurable: true }); } catch (e) { }
+                            } catch (e) { }
+                            var antes = null;
+                            try { antes = Object.getOwnPropertyDescriptor(vista, 'event'); } catch (e) { }
+                            try { Object.defineProperty(vista, 'event', { value: ev, configurable: true, writable: true }); } catch (e) { }
+                            try { fn.call(base); }
+                            finally {
+                                try {
+                                    if (antes) Object.defineProperty(vista, 'event', antes);
+                                    else delete vista.event;
+                                } catch (e) { }
+                            }
+                        });
+
+                        // ── Enviar o formulário como o navegador faria ao clicar,
+                        // levando junto o nome do botão (é assim que o servidor sabe
+                        // que a ação pedida foi "inserir").
+                        jeitos.push(function () {
+                            var f = base.form || (base.closest && base.closest('form'));
+                            if (!f) return;
+                            if (f.requestSubmit) { f.requestSubmit(); return; }
+                        });
+                        jeitos.push(function () {
+                            var f = base.form || (base.closest && base.closest('form'));
+                            if (!f) return;
+                            var extra = null;
+                            try {
+                                if (base.name) {
+                                    extra = (f.ownerDocument || document).createElement('input');
+                                    extra.type = 'hidden';
+                                    extra.name = base.name;
+                                    extra.value = base.value || 'Inserir';
+                                    f.appendChild(extra);
+                                }
+                                var envio = (vista.HTMLFormElement && vista.HTMLFormElement.prototype.submit) || f.submit;
+                                envio.call(f);
+                            } catch (e) {
+                                try { f.submit(); } catch (e2) { }
+                            }
+                        });
+
                         niveis.forEach(function (el) {
                             jeitos.push(function () { if (typeof el.click === 'function') el.click(); });
                             jeitos.push(function () { disparar(el); });
@@ -2706,13 +2804,36 @@
                                 log('⚠️ ' + (pre.nome || cod) + ' não entrou — seguindo para o próximo');
                                 await espera(500);
                             } else if (res === 'falhou') {
-                                // O portal não aceitou o clique automático. Em vez de
-                                // parar, passamos para o modo assistido — a linha já
-                                // está preenchida, basta você clicar em INSERIR.
                                 desanotar(cod);
                                 b.disabled = false;
-                                log('ℹ️ Este portal só aceita o clique de verdade.\nPassando para o modo assistido...');
-                                await espera(900);
+
+                                // Guarda tudo que descobrimos sobre a função do portal,
+                                // num quadro que dá para selecionar e copiar.
+                                var relato = 'BOTÃO: ' + descrever(pre.linha.inserir) +
+                                    '\n\nO QUE A FUNÇÃO FEZ: ' + (acoes.length ? acoes.join(' | ') : 'NADA (desistiu calada)') +
+                                    (avisos.length ? '\n\nAVISOS DO PORTAL: ' + avisos.join(' | ') : '') +
+                                    (errosJS.length ? '\n\nERROS: ' + errosJS.join(' | ') : '') +
+                                    '\n\nCÓDIGO DA FUNÇÃO:\n' + (fonteDaFuncao(pre.linha.inserir) || '(não consegui ler)');
+                                try {
+                                    var cx = document.createElement('textarea');
+                                    cx.id = 'ass-diag';
+                                    cx.readOnly = true;
+                                    cx.value = relato;
+                                    cx.style.cssText = 'width:100%;height:110px;margin-top:8px;font-size:10px;' +
+                                        'font-family:Consolas,monospace;background:#0a1c33;color:#9ecbff;' +
+                                        'border:1px solid #4a90d9;border-radius:4px;padding:6px;box-sizing:border-box;';
+                                    var velho = document.getElementById('ass-diag');
+                                    if (velho) velho.remove();
+                                    document.getElementById('ass-log').insertAdjacentElement('afterend', cx);
+                                    cx.select();
+                                    try { document.execCommand('copy'); } catch (e) { }
+                                } catch (e) { }
+
+                                log('ℹ️ O clique automático não passou neste portal.\n' +
+                                    'Copiei o diagnóstico abaixo (já está na área de transferência) —\n' +
+                                    'mande para eu deixar 100% automático.\n\n' +
+                                    'Enquanto isso, sigo no modo assistido: eu preencho, você só clica em INSERIR.');
+                                await espera(1500);
                                 await modoAssistido(i, lancados, recusados, b);
                                 return;
                             } else {
