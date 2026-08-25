@@ -2230,7 +2230,7 @@
 
                     var caixa = document.createElement('div');
                     caixa.id = 'painel-assedf-agente';
-                    caixa.style.cssText = 'position:fixed;top:12px;right:12px;z-index:2147483647;width:270px;' +
+                    caixa.style.cssText = 'position:fixed;bottom:12px;left:12px;z-index:2147483647;width:270px;' +
                         'background:#1b3a6b;color:#fff;padding:12px;border-radius:8px;font-family:Arial,sans-serif;' +
                         'font-size:12px;box-shadow:0 6px 20px rgba(0,0,0,.55);border:3px solid #e67e22;';
                     caixa.innerHTML =
@@ -2464,6 +2464,35 @@
                         } catch (e) { return '?'; }
                     };
 
+                    // Clique o mais parecido possível com o de uma pessoa:
+                    // sequência completa de eventos, nas coordenadas reais do botão.
+                    var cliqueRealista = function (el, vista) {
+                        try { el.scrollIntoView({ block: 'center' }); } catch (e) { }
+                        var r = { left: 0, top: 0, width: 10, height: 10 };
+                        try { r = el.getBoundingClientRect(); } catch (e) { }
+                        var x = Math.round(r.left + r.width / 2);
+                        var y = Math.round(r.top + r.height / 2);
+                        var base = {
+                            bubbles: true, cancelable: true, composed: true, view: vista,
+                            clientX: x, clientY: y, screenX: x, screenY: y,
+                            button: 0, buttons: 1, detail: 1
+                        };
+                        var P = vista.PointerEvent, M = vista.MouseEvent || MouseEvent;
+                        var disp = function (Ctor, tipo, extra) {
+                            if (!Ctor) return;
+                            var o = {};
+                            for (var k in base) o[k] = base[k];
+                            if (extra) for (var k2 in extra) o[k2] = extra[k2];
+                            try { el.dispatchEvent(new Ctor(tipo, o)); } catch (e) { }
+                        };
+                        if (P) { disp(P, 'pointerover'); disp(P, 'pointerenter'); disp(P, 'pointermove'); disp(P, 'pointerdown'); }
+                        disp(M, 'mouseover'); disp(M, 'mouseenter'); disp(M, 'mousemove'); disp(M, 'mousedown');
+                        try { el.focus(); } catch (e) { }
+                        if (P) disp(P, 'pointerup', { buttons: 0 });
+                        disp(M, 'mouseup', { buttons: 0 });
+                        disp(M, 'click', { buttons: 0 });
+                    };
+
                     var acionar = async function (linha, cod) {
                         var base = linha.inserir;
                         try {
@@ -2500,7 +2529,7 @@
                             } catch (e) { }
                         };
 
-                        var jeitos = [];
+                        var jeitos = [function () { cliqueRealista(base, vista); }];
                         niveis.forEach(function (el) {
                             jeitos.push(function () { if (typeof el.click === 'function') el.click(); });
                             jeitos.push(function () { disparar(el); });
@@ -2543,90 +2572,40 @@
                         return 'falhou';
                     };
 
-                    document.getElementById('ass-go').onclick = async function () {
-                        instalarEscudo();
-                        var b = document.getElementById('ass-go');
-                        itens = lerCodigos();
-                        b.disabled = true;
-                        b.style.background = '#c0392b';
-                        b.innerText = '⏳ Lançando...';
+                    // Prepara a linha: código → espera o nome → quantidade.
+                    // Devolve tudo que o passo seguinte precisa.
+                    var prepararLinha = async function (cod, qtd) {
+                        var linha = null;
+                        for (var t = 0; t < 40; t++) {
+                            linha = linhaLivre(t > 8);
+                            if (linha) break;
+                            await espera(300);
+                        }
+                        if (!linha) return null;
 
-                        var lancados = 0, recusados = [], parou = null;
-                        var feitos = jaFeitos();
-                        for (var i = 0; i < itens.length; i++) {
-                            var cod = itens[i].cod, qtd = itens[i].qtd;
+                        var jaEstava = textoDaTela().indexOf(cod) !== -1;
+                        escrever(linha.cod, cod);
+                        sair(linha.cod);
 
-                            // já entrou antes (ou já está na tela): não repete
-                            if (feitos.indexOf(cod) !== -1 || textoDaTela().indexOf(cod) !== -1) {
-                                lancados++;
-                                log('↷ ' + (i + 1) + '/' + itens.length + ' — ' + cod + ' já estava lançado');
-                                await espera(120);
-                                continue;
+                        var nome = '';
+                        for (var w = 0; w < 40; w++) {
+                            if (linha.desc && (linha.desc.value || '').trim().length > 2) {
+                                nome = linha.desc.value.trim(); break;
                             }
-
-                            log('⏳ ' + (i + 1) + '/' + itens.length + ' — ' + cod + (qtd > 1 ? ' (qtd ' + qtd + ')' : ''));
-
-                            var linha = null;
-                            for (var t = 0; t < 40; t++) {
-                                linha = linhaLivre(t > 8);
-                                if (linha) break;
-                                await espera(300);
-                            }
-                            if (!linha) {
-                                parou = (i === 0)
-                                    ? 'não encontrei a tabela de procedimentos nesta tela'
-                                    : 'não apareceu linha para o código ' + cod;
-                                break;
-                            }
-
-                            escrever(linha.cod, cod);
-                            sair(linha.cod);
-
-                            // O nome do exame pode vir num campo OU como texto na
-                            // linha (no portal ele aparece como link azul).
-                            var nome = '';
-                            for (var w = 0; w < 40; w++) {
-                                if (linha.desc && (linha.desc.value || '').trim().length > 2) {
-                                    nome = linha.desc.value.trim(); break;
-                                }
-                                var bruto = (linha.tr.innerText || linha.tr.textContent || '')
-                                    .replace(/\s+/g, ' ').trim();
-                                var limpo = bruto.split(cod).join(' ')
-                                    .replace(/\b(inserir|zerar|inclui[r]?|excluir)\b/gi, ' ')
-                                    .replace(/(^|\s)P(\s|$)/g, ' ')
-                                    .replace(/\s+/g, ' ').trim();
-                                if (limpo.length > 4) { nome = limpo; break; }
-                                await espera(250);
-                            }
-
-                            if (linha.qtd) { escrever(linha.qtd, qtd); sair(linha.qtd); await espera(200); }
-
-                            limparAviso();
-                            // Anotamos ANTES de acionar: se a tela recarregar no meio
-                            // do processo, o ajudante volta sabendo que este já foi.
-                            anotarFeito(cod);
-                            var res = await acionar(linha, cod);
-
-                            if (res === 'recusado') {
-                                desanotar(cod);          // não entrou: pode tentar de novo
-                                recusados.push(nome || cod);
-                                limparAviso();
-                                var atual = linhaLivre(true);
-                                if (atual) { escrever(atual.cod, ''); if (atual.desc) escrever(atual.desc, ''); }
-                                log('⚠️ ' + (nome || cod) + ' não entrou — seguindo para o próximo');
-                                await espera(500);
-                            } else if (res === 'falhou') {
-                                desanotar(cod);
-                                parou = 'o botão "Inserir" não respondeu no código ' + cod +
-                                        '\n[' + descrever(linha.inserir) + ']';
-                                if (avisos.length) parou += '\nO portal avisou: ' + avisos.slice(-3).join(' | ');
-                                if (errosJS.length) parou += '\nErro na página: ' + errosJS.slice(-3).join(' | ');
-                                break;
-                            } else {
-                                lancados++;
-                            }
+                            var bruto = (linha.tr.innerText || linha.tr.textContent || '').replace(/\s+/g, ' ').trim();
+                            var limpo = bruto.split(cod).join(' ')
+                                .replace(/\b(inserir|zerar|inclui[r]?|excluir)\b/gi, ' ')
+                                .replace(/(^|\s)P(\s|$)/g, ' ')
+                                .replace(/\s+/g, ' ').trim();
+                            if (limpo.length > 4) { nome = limpo; break; }
+                            await espera(250);
                         }
 
+                        if (linha.qtd) { escrever(linha.qtd, qtd); sair(linha.qtd); await espera(200); }
+                        return { linha: linha, nome: nome, jaEstava: jaEstava };
+                    };
+
+                    var finalizar = function (lancados, recusados, parou, b) {
                         var fim = (parou ? '⚠️ Parei: ' + parou + '\n' : '✅ Concluído! ') +
                                   lancados + ' de ' + itens.length + ' exame(s) lançado(s).';
                         if (recusados.length) {
@@ -2640,6 +2619,108 @@
                         b.disabled = false;
                         b.style.background = parou ? '#e67e22' : '#27ae60';
                         b.innerText = parou ? '🔁 Tentar de novo' : '✅ Concluído';
+                    };
+
+                    // ── MODO ASSISTIDO ──
+                    // Se o portal só aceitar o clique de uma pessoa de verdade, o
+                    // ajudante preenche a linha e espera VOCÊ clicar em INSERIR —
+                    // e assim que o exame entra, ele já prepara o próximo sozinho.
+                    var modoAssistido = async function (inicio, lancados, recusados, b) {
+                        b.style.background = '#2980b9';
+                        b.innerText = '👆 Modo assistido';
+                        for (var i = inicio; i < itens.length; i++) {
+                            var cod = itens[i].cod, qtd = itens[i].qtd;
+                            if (textoDaTela().indexOf(cod) !== -1) { lancados++; continue; }
+
+                            var pre = await prepararLinha(cod, qtd);
+                            if (!pre) { finalizar(lancados, recusados, 'não apareceu linha para o código ' + cod, b); return; }
+
+                            log('👆 ' + (i + 1) + '/' + itens.length + ' — ' + cod +
+                                (pre.nome ? '\n' + pre.nome.slice(0, 42) : '') +
+                                '\n\nAgora CLIQUE EM "INSERIR" na tela.\nAssim que entrar eu preparo o próximo.');
+
+                            var entregue = false;
+                            for (var k = 0; k < 2400; k++) {          // espera até 10 minutos
+                                await espera(250);
+                                if (recusou()) {
+                                    recusados.push(pre.nome || cod);
+                                    desanotar(cod);
+                                    limparAviso();
+                                    try {
+                                        var at = linhaLivre(true);
+                                        if (at) { escrever(at.cod, ''); if (at.desc) escrever(at.desc, ''); }
+                                    } catch (e) { }
+                                    entregue = true;
+                                    break;
+                                }
+                                if (entrou(pre.linha, cod, pre.jaEstava)) {
+                                    lancados++; anotarFeito(cod); entregue = true; break;
+                                }
+                            }
+                            if (!entregue) { finalizar(lancados, recusados, 'esperei demais pelo clique em Inserir', b); return; }
+                        }
+                        finalizar(lancados, recusados, null, b);
+                    };
+
+                    document.getElementById('ass-go').onclick = async function () {
+                        instalarEscudo();
+                        var b = document.getElementById('ass-go');
+                        itens = lerCodigos();
+                        b.disabled = true;
+                        b.style.background = '#c0392b';
+                        b.innerText = '⏳ Lançando...';
+
+                        var lancados = 0, recusados = [], parou = null;
+                        var feitos = jaFeitos();
+
+                        for (var i = 0; i < itens.length; i++) {
+                            var cod = itens[i].cod, qtd = itens[i].qtd;
+
+                            if (feitos.indexOf(cod) !== -1 || textoDaTela().indexOf(cod) !== -1) {
+                                lancados++;
+                                log('↷ ' + (i + 1) + '/' + itens.length + ' — ' + cod + ' já estava lançado');
+                                await espera(120);
+                                continue;
+                            }
+
+                            log('⏳ ' + (i + 1) + '/' + itens.length + ' — ' + cod + (qtd > 1 ? ' (qtd ' + qtd + ')' : ''));
+                            var pre = await prepararLinha(cod, qtd);
+                            if (!pre) {
+                                parou = (i === 0) ? 'não encontrei a tabela de procedimentos nesta tela'
+                                                  : 'não apareceu linha para o código ' + cod;
+                                break;
+                            }
+
+                            limparAviso();
+                            anotarFeito(cod);
+                            var res = await acionar(pre.linha, cod);
+
+                            if (res === 'recusado') {
+                                desanotar(cod);
+                                recusados.push(pre.nome || cod);
+                                limparAviso();
+                                try {
+                                    var atual = linhaLivre(true);
+                                    if (atual) { escrever(atual.cod, ''); if (atual.desc) escrever(atual.desc, ''); }
+                                } catch (e) { }
+                                log('⚠️ ' + (pre.nome || cod) + ' não entrou — seguindo para o próximo');
+                                await espera(500);
+                            } else if (res === 'falhou') {
+                                // O portal não aceitou o clique automático. Em vez de
+                                // parar, passamos para o modo assistido — a linha já
+                                // está preenchida, basta você clicar em INSERIR.
+                                desanotar(cod);
+                                b.disabled = false;
+                                log('ℹ️ Este portal só aceita o clique de verdade.\nPassando para o modo assistido...');
+                                await espera(900);
+                                await modoAssistido(i, lancados, recusados, b);
+                                return;
+                            } else {
+                                lancados++;
+                            }
+                        }
+
+                        finalizar(lancados, recusados, parou, b);
                     };
                 };
 
