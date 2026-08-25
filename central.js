@@ -2463,7 +2463,16 @@
                     var textoDaTela = function () {
                         var t = '';
                         docs().forEach(function (d) {
-                            try { t += ' ' + (d.body ? (d.body.innerText || d.body.textContent || '') : ''); } catch (e) { }
+                            try {
+                                if (!d.body) return;
+                                // Ignora o nosso próprio painel: ele mostra o código
+                                // em andamento e faria o robô achar que já entrou.
+                                var f = d.body.children;
+                                for (var i = 0; i < f.length; i++) {
+                                    if (f[i].id === 'painel-assedf-agente') continue;
+                                    t += ' ' + (f[i].innerText || f[i].textContent || '');
+                                }
+                            } catch (e) { }
                         });
                         return t;
                     };
@@ -2596,7 +2605,10 @@
                         }
                     };
 
+                    var jeitoQueFunciona = -1;
+
                     var acionar = async function (linha, cod) {
+                        limparAviso();          // aviso antigo não pode contaminar este exame
                         var base = linha.inserir;
                         try {
                             var p2 = base.closest && base.closest('a,button,input[type=button],input[type=submit]');
@@ -2691,13 +2703,42 @@
                             } catch (e) { try { f.submit(); } catch (e2) { } }
                         });
 
+                        // Espera o portal responder. A ordem aqui importa muito:
+                        // primeiro olhamos se o exame ENTROU, e só depois o aviso.
+                        // Se o aviso aparecer mas o exame estiver na lista, é aviso
+                        // de repetição (nós acionamos duas vezes) — não é recusa.
+                        var esperarResposta = async function (voltas) {
+                            for (var k = 0; k < voltas; k++) {
+                                await espera(220);
+                                if (!jaEstava && textoDaTela().indexOf(cod) !== -1) return 'ok';
+                                if (recusou()) {
+                                    if (textoDaTela().indexOf(cod) !== -1) { limparAviso(); return 'ok'; }
+                                    return 'recusado';
+                                }
+                                if (entrou(linha, cod, jaEstava)) return 'ok';
+                            }
+                            return null;
+                        };
+
+                        // Se já descobrimos qual jeito funciona neste portal, usamos
+                        // só ele — assim nunca acionamos duas vezes o mesmo exame.
+                        if (jeitoQueFunciona >= 0 && jeitos[jeitoQueFunciona]) {
+                            instalarEscudo();
+                            try { jeitos[jeitoQueFunciona](); } catch (e) { errosJS.push(e.message || 'erro'); }
+                            var rc = await esperarResposta(30);
+                            if (rc) return rc;
+                        }
+
                         for (var j = 0; j < jeitos.length; j++) {
+                            if (j === jeitoQueFunciona) continue;
                             instalarEscudo();
                             try { jeitos[j](); } catch (e) { errosJS.push(e.message || 'erro'); }
-                            for (var k = 0; k < 6; k++) {
-                                await espera(220);
-                                if (recusou()) return 'recusado';
-                                if (entrou(linha, cod, jaEstava)) return 'ok';
+                            // O primeiro jeito ganha uma espera bem maior: é o mais
+                            // provável, e insistir cedo demais causava a duplicidade.
+                            var r = await esperarResposta(j === 0 ? 30 : 10);
+                            if (r) {
+                                if (r === 'ok') jeitoQueFunciona = j;
+                                return r;
                             }
                         }
                         return 'falhou';
@@ -2871,6 +2912,7 @@
                                 return;
                             } else {
                                 lancados++;
+                                limparAviso();   // deixa a tela limpa para o próximo
                             }
                         }
 
