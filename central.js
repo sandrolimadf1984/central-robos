@@ -319,7 +319,10 @@
     };
 
     // ── FECHAR APP ────────────────────────────────────────────────
-    document.getElementById('cr-fechar-app').onclick = () => menu.remove();  // motor é desligado ao parar/concluir
+    document.getElementById('cr-fechar-app').onclick = () => {
+        limparPaineisDoRobo();   // não deixa painel escondido para trás na página
+        menu.remove();
+    };
 
     // ── SISTEMA DE AVISOS DINÂMICOS ───────────────────────────────
     const linkDoAviso = "https://raw.githubusercontent.com/sandrolimadf1984/central-robos/main/aviso.txt";
@@ -3651,6 +3654,7 @@
 
     // ── ESTADO DA EXECUÇÃO ────────────────────────────────────────
     let rodando = false;
+    let roboAtual = null;
     let elementosRobo = [];
     let janelasRobo = [];
     let vigias = [];
@@ -4437,7 +4441,6 @@
     };
 
     // ── NAVEGAÇÃO ENTRE AS DUAS TELAS ─────────────────────────────
-    let roboAtual = null;
     const btnIniciar = document.getElementById('cr-iniciar');
     const btnLimpar = document.getElementById('cr-limpar');
     const campoCodigos = document.getElementById('cr-txt-codigos');
@@ -4742,9 +4745,46 @@
         dialogos = null;
     };
 
+    // Os painéis dos robôs ficam escondidos FORA DA TELA (não podem sumir de
+    // vez enquanto rodam, senão o robô perde os próprios botões). Só que eles
+    // continuam no documento — e a caixa de códigos deles faz o Ctrl+F do
+    // navegador contar cada código duas vezes. Ao terminar, tiramos de vez.
+    const limparPaineisDoRobo = () => {
+        try {
+            const lista = elementosRobo.slice();
+            elementosRobo = [];
+
+            // Reforço: acha o painel pelos ids que o próprio robô usa, mesmo que
+            // ele não tenha passado pelo nosso registro.
+            try {
+                const inf = infoRobos[roboAtual] || {};
+                [inf.txt, inf.btn, statusRobo[roboAtual], contadorRobo[roboAtual]]
+                    .filter(Boolean).forEach(id => {
+                        const alvo = document.getElementById(id);
+                        if (!alvo) return;
+                        let p = alvo;
+                        while (p && p.parentElement && p.parentElement !== document.body) p = p.parentElement;
+                        if (!p || p === document.body) return;
+                        if (menu && (p === menu || p.contains(menu))) return;   // nunca o nosso menu
+                        if (lista.indexOf(p) === -1) lista.push(p);
+                    });
+            } catch (e) { }
+
+            lista.forEach(el => {
+                try {
+                    const t = el.querySelectorAll('textarea, input');
+                    for (let i = 0; i < t.length; i++) { try { t[i].value = ''; } catch (e) { } }
+                    if (el.parentNode) el.parentNode.removeChild(el);
+                } catch (e) { }
+            });
+        } catch (e) { }
+    };
+
     const encerrarModoAutomacao = () => {
         restaurarAvisos();
         desligarMotorFundo();
+        // com uma folga: alguns robôs ainda dão um último retoque na tela
+        try { setTimeout(limparPaineisDoRobo, 3000); } catch (e) { limparPaineisDoRobo(); }
     };
 
     // ── CAMINHO PADRÃO: robôs que já rodam na própria página ──────
@@ -5038,6 +5078,7 @@
         janelasRobo = [];
         ultimoAviso = '';
         modoParar();
+        roboAtual = nome;
         const infoAtual = infoRobos[nome] || {};
         try { ligarMotorFundo(!!infoAtual.semMotor); } catch (e) { console.log('motor de fundo indisponível:', e.message); }
         try { silenciarAvisos(); } catch (e) { console.log('aviso:', e.message); }
