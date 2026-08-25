@@ -2484,14 +2484,10 @@
                     // informação que permite reproduzir exatamente o que ela faz.
                     var fonteDaFuncao = function (el) {
                         try {
-                            var oc = el.getAttribute && el.getAttribute('onclick');
-                            if (!oc) return '';
-                            var m = oc.match(/([A-Za-z_$][\w$]*)\s*\(/);
-                            if (!m) return '';
-                            var v = (el.ownerDocument && el.ownerDocument.defaultView) || window;
-                            var fn = v[m[1]];
-                            if (typeof fn !== 'function') return m[1] + '() NÃO EXISTE nesta janela';
-                            return String(fn).replace(/\s+/g, ' ').slice(0, 500);
+                            var a3 = acharFuncao(el);
+                            if (!a3) return '';
+                            if (!a3.fn) return a3.nome + '() NÃO EXISTE em nenhuma janela alcançável';
+                            return String(a3.fn).replace(/\s+/g, ' ').slice(0, 500);
                         } catch (e) { return ''; }
                     };
 
@@ -2535,6 +2531,71 @@
                         disp(M, 'click', { buttons: 0 });
                     };
 
+                    // A função do portal pode estar em OUTRA janela (a página usa
+                    // quadros). Procuramos em todas as alcançáveis: a do próprio
+                    // botão, a da tela, o pai, o topo, os quadros e a janela de origem.
+                    var todasAsJanelas = function (el) {
+                        var lista = [];
+                        var por = function (w) {
+                            try {
+                                if (!w || lista.indexOf(w) !== -1) return;
+                                void w.document;
+                                lista.push(w);
+                                for (var i = 0; i < w.frames.length; i++) por(w.frames[i]);
+                            } catch (e) { }
+                        };
+                        try { por(el && el.ownerDocument && el.ownerDocument.defaultView); } catch (e) { }
+                        por(window);
+                        try { por(window.parent); } catch (e) { }
+                        try { por(window.top); } catch (e) { }
+                        try { por(window.opener); } catch (e) { }
+                        return lista;
+                    };
+
+                    var nomeNoOnclick = function (el) {
+                        try {
+                            var oc = el.getAttribute && el.getAttribute('onclick');
+                            if (!oc) return null;
+                            var m = oc.match(/([A-Za-z_$][\w$]*)\s*\(/);
+                            return m ? m[1] : null;
+                        } catch (e) { return null; }
+                    };
+
+                    var acharFuncao = function (el) {
+                        var nome = nomeNoOnclick(el);
+                        if (!nome) return null;
+                        var js = todasAsJanelas(el);
+                        for (var i = 0; i < js.length; i++) {
+                            try {
+                                if (typeof js[i][nome] === 'function') return { nome: nome, fn: js[i][nome], win: js[i] };
+                            } catch (e) { }
+                        }
+                        return { nome: nome, fn: null, win: null };
+                    };
+
+                    var chamarFuncao = function (el) {
+                        var achado = acharFuncao(el);
+                        if (!achado || !achado.fn) return false;
+                        var v = achado.win;
+                        var ev = null;
+                        try {
+                            ev = new (v.MouseEvent || MouseEvent)('click', { bubbles: true, view: v });
+                            try { Object.defineProperty(ev, 'target', { value: el, configurable: true }); } catch (e) { }
+                            try { Object.defineProperty(ev, 'srcElement', { value: el, configurable: true }); } catch (e) { }
+                        } catch (e) { }
+                        var antes = null;
+                        try { antes = Object.getOwnPropertyDescriptor(v, 'event'); } catch (e) { }
+                        try { Object.defineProperty(v, 'event', { value: ev, configurable: true, writable: true }); } catch (e) { }
+                        try { achado.fn.call(el); return true; }
+                        catch (e) { errosJS.push(achado.nome + ': ' + (e.message || 'erro')); return false; }
+                        finally {
+                            try {
+                                if (antes) Object.defineProperty(v, 'event', antes);
+                                else delete v.event;
+                            } catch (e) { }
+                        }
+                    };
+
                     var acionar = async function (linha, cod) {
                         var base = linha.inserir;
                         try {
@@ -2571,62 +2632,19 @@
                             } catch (e) { }
                         };
 
-                        var jeitos = [function () { cliqueRealista(base, vista); }];
-
-                        // ── Chamar a função do portal diretamente, com o "event"
-                        // montado. Portais dessa época leem window.event.srcElement
-                        // para saber qual linha inserir; sem isso, desistem calados.
-                        jeitos.push(function () {
-                            var oc = base.getAttribute && base.getAttribute('onclick');
-                            if (!oc) return;
-                            var m = oc.match(/([A-Za-z_$][\w$]*)\s*\(/);
-                            if (!m) return;
-                            var fn = vista[m[1]];
-                            if (typeof fn !== 'function') return;
-                            var ev = null;
-                            try {
-                                ev = new (vista.MouseEvent || MouseEvent)('click', { bubbles: true, view: vista });
-                                try { Object.defineProperty(ev, 'target', { value: base, configurable: true }); } catch (e) { }
-                                try { Object.defineProperty(ev, 'srcElement', { value: base, configurable: true }); } catch (e) { }
-                            } catch (e) { }
-                            var antes = null;
-                            try { antes = Object.getOwnPropertyDescriptor(vista, 'event'); } catch (e) { }
-                            try { Object.defineProperty(vista, 'event', { value: ev, configurable: true, writable: true }); } catch (e) { }
-                            try { fn.call(base); }
-                            finally {
-                                try {
-                                    if (antes) Object.defineProperty(vista, 'event', antes);
-                                    else delete vista.event;
-                                } catch (e) { }
-                            }
-                        });
-
-                        // ── Enviar o formulário como o navegador faria ao clicar,
-                        // levando junto o nome do botão (é assim que o servidor sabe
-                        // que a ação pedida foi "inserir").
-                        jeitos.push(function () {
-                            var f = base.form || (base.closest && base.closest('form'));
-                            if (!f) return;
-                            if (f.requestSubmit) { f.requestSubmit(); return; }
-                        });
-                        jeitos.push(function () {
-                            var f = base.form || (base.closest && base.closest('form'));
-                            if (!f) return;
-                            var extra = null;
-                            try {
-                                if (base.name) {
-                                    extra = (f.ownerDocument || document).createElement('input');
-                                    extra.type = 'hidden';
-                                    extra.name = base.name;
-                                    extra.value = base.value || 'Inserir';
-                                    f.appendChild(extra);
-                                }
-                                var envio = (vista.HTMLFormElement && vista.HTMLFormElement.prototype.submit) || f.submit;
-                                envio.call(f);
-                            } catch (e) {
-                                try { f.submit(); } catch (e2) { }
-                            }
-                        });
+                        var jeitos = [
+                            // 1º: chamar a função do portal NA JANELA ONDE ELA VIVE
+                            function () { chamarFuncao(base); },
+                            // 2º: executar o comando do botão nessa mesma janela
+                            function () {
+                                var a2 = acharFuncao(base);
+                                if (!a2 || !a2.win) return;
+                                var oc = base.getAttribute && base.getAttribute('onclick');
+                                if (oc) a2.win.eval(oc);
+                            },
+                            // 3º: clique o mais fiel possível
+                            function () { cliqueRealista(base, vista); }
+                        ];
 
                         niveis.forEach(function (el) {
                             jeitos.push(function () { if (typeof el.click === 'function') el.click(); });
@@ -2651,11 +2669,26 @@
                                 try { alvo.dispatchEvent(new K(t, { key: 'Enter', keyCode: 13, which: 13, bubbles: true })); } catch (e) { }
                             });
                         });
-                        jeitos.push(function () {                       // envia o formulário
+                        // Último recurso: enviar o formulário. Fica no fim porque,
+                        // sozinho, ele recarrega a tela sem inserir nada.
+                        jeitos.push(function () {
+                            var f = base.form || (base.closest && base.closest('form'));
+                            if (f && f.requestSubmit) f.requestSubmit();
+                        });
+                        jeitos.push(function () {
+                            var f = base.form || (base.closest && base.closest('form'));
+                            if (!f) return;
                             try {
-                                var f = base.form || (base.closest && base.closest('form'));
-                                if (f && typeof f.submit === 'function') f.submit();
-                            } catch (e) { }
+                                if (base.name) {
+                                    var extra = (f.ownerDocument || document).createElement('input');
+                                    extra.type = 'hidden';
+                                    extra.name = base.name;
+                                    extra.value = base.value || 'Inserir';
+                                    f.appendChild(extra);
+                                }
+                                var envio = (vista.HTMLFormElement && vista.HTMLFormElement.prototype.submit) || f.submit;
+                                envio.call(f);
+                            } catch (e) { try { f.submit(); } catch (e2) { } }
                         });
 
                         for (var j = 0; j < jeitos.length; j++) {
@@ -2934,33 +2967,6 @@
                     } catch (e) { }
                 });
 
-                // Nomes de janela usados pela página — permitem recuperar a janela
-                // depois de aberta, sem precisar tê-la capturado no nascimento.
-                var nomesDeJanela = function () {
-                    var achados = [], texto = '';
-                    janelasLocais().forEach(function (w) {
-                        try {
-                            var d = w.document;
-                            Array.prototype.slice.call(d.querySelectorAll('[onclick],a[href],form[action],[target]'))
-                                .forEach(function (e) {
-                                    texto += ' ' + (e.getAttribute('onclick') || '') +
-                                             ' ' + (e.getAttribute('target') || '');
-                                });
-                            Array.prototype.slice.call(d.querySelectorAll('script')).forEach(function (sc) {
-                                if (!sc.src) texto += ' ' + (sc.textContent || '');
-                            });
-                        } catch (e) { }
-                    });
-                    var re = /open\s*\(\s*[^,()]*,\s*['"]([^'"]+)['"]/g, m;
-                    while ((m = re.exec(texto))) {
-                        var n = (m[1] || '').trim();
-                        if (n && !/^_(blank|self|top|parent)$/i.test(n) && achados.indexOf(n) === -1) achados.push(n);
-                    }
-                    return achados.slice(0, 4);
-                };
-
-                // Links e formulários com destino não passam pelo window.open:
-                // damos um nome conhecido a eles no momento do clique.
                 var marcouNome = false, tentativasNome = 0;
                 janelasLocais().forEach(function (jw) {
                 try {
@@ -2986,27 +2992,25 @@
                     if (voltas > 2400) { try { clearInterval(vigia); } catch (e) { } return; }   // ~36 min
                     var lista = alvos.slice();
                     try { (window.__crJanelas || []).forEach(function (w) { lista.push(w); }); } catch (e) { }
-                    // Tenta recuperar a janela pelo nome (poucas vezes, e fechando
-                    // qualquer janela em branco que nasça da tentativa)
-                    if (tentativasNome < 10) {
+                    // Recuperar pela janela nomeada — só quando o atendente
+                    // realmente clicou em "Cadastrar Procedimentos", e no máximo
+                    // três vezes. Antes isso rodava sem parar e fazia a tela tremer.
+                    if (marcouNome && tentativasNome < 3) {
                         tentativasNome++;
-                        var nomes = ['crAssedfProc'].concat(nomesDeJanela());
-                        nomes.forEach(function (n) {
-                            try {
-                                var w2 = window.open('', n);
-                                if (!w2 || w2 === window) return;
-                                lista.push(w2);
-                                var vazia = false;
-                                try {
-                                    vazia = (w2.location.href === 'about:blank') &&
-                                        (!w2.document || !w2.document.body || !(w2.document.body.innerHTML || '').trim());
-                                } catch (e3) { vazia = false; }
-                                if (vazia) { try { w2.close(); } catch (e4) { } }
-                            } catch (e) { }
-                        });
+                        try {
+                            var w2 = window.open('', 'crAssedfProc');
+                            if (w2 && w2 !== window) lista.push(w2);
+                        } catch (e) { }
                     }
-                    for (var i = 0; i < lista.length; i++) injetar(lista[i]);
-                }, 900);
+
+                    for (var i = 0; i < lista.length; i++) {
+                        if (injetar(lista[i])) {
+                            // conseguiu: não precisa mais ficar varrendo
+                            try { clearInterval(vigia); } catch (e) { }
+                            return;
+                        }
+                    }
+                }, 1500);
 
                 diz('✅ ' + itens.length + ' código(s) guardado(s) na memória.\n\n' +
                     '➡️ Agora clique em "Cadastrar Procedimentos".\n' +
