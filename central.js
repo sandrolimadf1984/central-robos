@@ -83,46 +83,22 @@
 
         <div id="cr-aviso-slot"></div>
 
-        <div style="display:flex;align-items:center;gap:12px;background:linear-gradient(135deg,#0d1f3a,#0b1830);border:1px solid #24559b;border-radius:12px;padding:14px 14px 14px 16px;margin-bottom:14px;background-image:repeating-linear-gradient(0deg,rgba(45,125,255,0.05) 0 1px,transparent 1px 22px),repeating-linear-gradient(90deg,rgba(45,125,255,0.05) 0 1px,transparent 1px 22px);">
-            <div style="flex:1;min-width:0;">
-                <div style="font-size:16px;font-weight:800;color:#eaf3ff;letter-spacing:1px;margin-bottom:4px;">BEM-VINDO!</div>
-                <div style="font-size:11.5px;color:#8fa8cf;line-height:1.5;">Selecione o robô que deseja iniciar e automatize suas tarefas.</div>
+        <div style="background:linear-gradient(135deg,#0d1f3a,#0b1830);border:1px solid #24559b;border-radius:12px;padding:14px 16px;margin-bottom:14px;background-image:repeating-linear-gradient(0deg,rgba(45,125,255,0.05) 0 1px,transparent 1px 22px),repeating-linear-gradient(90deg,rgba(45,125,255,0.05) 0 1px,transparent 1px 22px);">
+            <div style="font-size:16px;font-weight:800;color:#eaf3ff;letter-spacing:1px;margin-bottom:4px;">BEM-VINDO!</div>
+            <div style="font-size:11.5px;color:#8fa8cf;line-height:1.5;">Selecione o robô que deseja iniciar e automatize suas tarefas.</div>
+            <div style="font-size:9.5px;color:#7f97bd;letter-spacing:1.4px;font-weight:700;margin:11px 0 5px;">PESQUISAR CONVENIO</div>
+            <div style="position:relative;">
+                <input id="cr-busca" type="text" autocomplete="off" spellcheck="false" placeholder="Digite o nome do convênio..."
+                    style="width:100%;box-sizing:border-box;background:#0b1526;border:1px solid #24559b;border-radius:16px;
+                           padding:8px 30px 8px 13px;color:#eaf3ff;font-size:12px;font-family:inherit;outline:none;">
+                <div id="cr-busca-limpar" title="Limpar" style="display:none;position:absolute;right:9px;top:50%;transform:translateY(-50%);
+                    width:17px;height:17px;border-radius:50%;background:#1b2c4a;color:#cfe0ff;font-size:11px;line-height:17px;
+                    text-align:center;cursor:pointer;user-select:none;">×</div>
             </div>
-            <svg width="128" height="92" viewBox="0 0 130 92" fill="none" style="flex-shrink:0;filter:drop-shadow(0 0 6px rgba(77,195,255,0.5));">
-                <g stroke="#4dc3ff" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M80 26 L102 18 L124 26 L102 34 Z" fill="rgba(45,125,255,0.16)"/><path d="M80 26 L102 34 L102 51 L80 43 Z" fill="rgba(10,26,52,0.6)"/><path d="M102 34 L124 26 L124 43 L102 51 Z" fill="rgba(10,26,52,0.4)"/><ellipse cx="91" cy="38" rx="5.4" ry="6.4" fill="rgba(77,195,255,0.18)"/><ellipse cx="91" cy="38" rx="2.4" ry="3" stroke="#2ecc71"/><path d="M108 40 L118 36 M108 45 L118 41" stroke-width="1.1"/>
-                    <path d="M40.8 10 L47.2 10 L46.6 30 L41.4 30 Z" fill="rgba(45,125,255,0.16)"/><path d="M42.9 6 L45.1 6 L45.1 10 L42.9 10 Z" fill="rgba(77,195,255,0.5)"/><path d="M41.4 30 L46.6 30 L45.4 42 L42.6 42 Z"/><path d="M42.6 42 L45.4 42 L44 50 Z" fill="rgba(77,195,255,0.35)"/>
-                    <path d="M50.8 7 L57.2 7 L56.6 27 L51.4 27 Z" fill="rgba(45,125,255,0.16)"/><path d="M52.9 3 L55.1 3 L55.1 7 L52.9 7 Z" fill="rgba(77,195,255,0.5)"/><path d="M51.4 27 L56.6 27 L55.4 39 L52.6 39 Z"/><path d="M52.6 39 L55.4 39 L54 47 Z" fill="rgba(77,195,255,0.35)"/>
-                    <path d="M60.8 11 L67.2 11 L66.6 31 L61.4 31 Z" fill="rgba(45,125,255,0.16)"/><path d="M62.9 7 L65.1 7 L65.1 11 L62.9 11 Z" fill="rgba(77,195,255,0.5)"/><path d="M61.4 31 L66.6 31 L65.4 43 L62.6 43 Z"/><path d="M62.6 43 L65.4 43 L64 51 Z" fill="rgba(77,195,255,0.35)"/>
-                    <path d="M14 64 L54 48 L92 60 L52 76 Z" fill="rgba(45,125,255,0.13)"/><path d="M14 64 L52 76 L52 85 L14 73 Z" fill="rgba(12,30,60,0.55)"/><path d="M52 76 L92 60 L92 69 L52 85 Z" fill="rgba(12,30,60,0.35)"/>
-                    <ellipse cx="22.1" cy="64.2" rx="2.1" ry="1.25"/>
-                    <ellipse cx="28.8" cy="61.5" rx="2.1" ry="1.25"/>
-                    <ellipse cx="35.4" cy="58.8" rx="2.1" ry="1.25"/>
-                    <ellipse cx="42.1" cy="56.2" rx="2.1" ry="1.25"/>
-                    <ellipse cx="48.8" cy="53.5" rx="2.1" ry="1.25"/>
-                    <ellipse cx="55.4" cy="50.8" rx="2.1" ry="1.25"/>
-                    <ellipse cx="31.6" cy="67.2" rx="2.1" ry="1.25"/>
-                    <ellipse cx="38.2" cy="64.5" rx="2.1" ry="1.25"/>
-                    <ellipse cx="44.9" cy="61.8" rx="2.1" ry="1.25"/>
-                    <ellipse cx="51.6" cy="59.2" rx="2.1" ry="1.25"/>
-                    <ellipse cx="58.2" cy="56.5" rx="2.1" ry="1.25"/>
-                    <ellipse cx="64.9" cy="53.8" rx="2.1" ry="1.25"/>
-                    <ellipse cx="41.1" cy="70.2" rx="2.1" ry="1.25"/>
-                    <ellipse cx="47.8" cy="67.5" rx="2.1" ry="1.25"/>
-                    <ellipse cx="54.4" cy="64.8" rx="2.1" ry="1.25"/>
-                    <ellipse cx="61.1" cy="62.2" rx="2.1" ry="1.25"/>
-                    <ellipse cx="67.8" cy="59.5" rx="2.1" ry="1.25"/>
-                    <ellipse cx="74.4" cy="56.8" rx="2.1" ry="1.25"/>
-                    <ellipse cx="50.6" cy="73.2" rx="2.1" ry="1.25"/>
-                    <ellipse cx="57.2" cy="70.5" rx="2.1" ry="1.25"/>
-                    <ellipse cx="63.9" cy="67.8" rx="2.1" ry="1.25"/>
-                    <ellipse cx="70.6" cy="65.2" rx="2.1" ry="1.25"/>
-                    <ellipse cx="77.2" cy="62.5" rx="2.1" ry="1.25"/>
-                    <ellipse cx="83.9" cy="59.8" rx="2.1" ry="1.25"/>
-                    <path d="M104 56 L104 72 Q104 78 108 78 Q112 78 112 72 L112 56" fill="rgba(45,125,255,0.13)"/><path d="M102.6 56 L113.4 56"/><path d="M105 70 Q108 73 111 70" stroke="#2ecc71"/><path d="M116 56 L116 72 Q116 78 120 78 Q124 78 124 72 L124 56" fill="rgba(45,125,255,0.13)"/><path d="M114.6 56 L125.4 56"/><path d="M117 70 Q120 73 123 70" stroke="#2ecc71"/>
-                    <path d="M18 80 L34 80" stroke-width="1.2"/><path d="M40 82 L52 82" stroke-width="1.2"/><path d="M70 74 L78 71 L80 74 L72 77 Z" fill="rgba(77,195,255,0.2)"/>
-                </g>
-            </svg>
+        </div>
+
+        <div id="cr-vazio" style="display:none;text-align:center;color:#8fa8cf;font-size:11.5px;padding:18px 10px;line-height:1.6;">
+            Nenhum convênio encontrado.<br><span style="color:#5f7aa3;font-size:10.5px;">Apague a pesquisa para ver todos.</span>
         </div>
 
         <div id="cr-lista" style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;overflow-y:auto;padding-right:4px;flex:1 1 auto;min-height:70px;align-content:start;"></div>
@@ -5311,6 +5287,14 @@
         { rotulo: "Unimed Seguros",    chave: "MEDSENIOR/UN SEG", icone: "💚", cor: "#16a085", desc: "Automação para Convênio Unimed Seguros" },
         { rotulo: "Unity Saúde",      chave: "ASSEFAZ",          icone: "🩶", cor: "#31445f", desc: "Automação para Convênios Unity Saúde" }
     ];
+    // Deixa o texto pronto para comparar: sem acento e em minúsculas, para
+    // "Unity Saúde" ser encontrado digitando "unity saude".
+    const semAcento = t => (t || '')
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase();
+
     const container = document.getElementById('cr-lista');
     for (const item of EXIBICAO) {
         const { rotulo, icone, cor, desc } = item;
@@ -5338,6 +5322,42 @@
         `;
         reservaDaMarca(card, icone, cor);
         card.onclick = () => abrirJanelaCodigos(item);
+        // guarda o nome sem acento e em minúsculas, para a pesquisa achar
+        // "unity" digitando "unity" ou "Unity", e "saude" digitando "saúde"
+        card.dataset.busca = semAcento(rotulo + ' ' + desc);
         container.appendChild(card);
     }
+
+    // ── PESQUISA DE CONVÊNIO ──────────────────────────────────────
+    // Filtra os cards conforme a pessoa digita. Apagando tudo, todos voltam.
+    (function () {
+        const campo = document.getElementById('cr-busca');
+        const limpar = document.getElementById('cr-busca-limpar');
+        const vazio = document.getElementById('cr-vazio');
+        if (!campo) return;
+
+        const filtrar = () => {
+            const termo = semAcento(campo.value.trim());
+            limpar.style.display = campo.value ? 'block' : 'none';
+            let achou = 0;
+            const cards = container.querySelectorAll('.cr-card');
+            for (let i = 0; i < cards.length; i++) {
+                const bate = !termo || (cards[i].dataset.busca || '').indexOf(termo) !== -1;
+                cards[i].style.display = bate ? '' : 'none';
+                if (bate) achou++;
+            }
+            vazio.style.display = achou ? 'none' : 'block';
+        };
+
+        campo.addEventListener('input', filtrar);
+        campo.addEventListener('keydown', e => {
+            if (e.key === 'Escape') { campo.value = ''; filtrar(); }
+            // Enter abre o convênio quando sobrou só um na lista
+            if (e.key === 'Enter') {
+                const visiveis = [...container.querySelectorAll('.cr-card')].filter(c => c.style.display !== 'none');
+                if (visiveis.length === 1) visiveis[0].click();
+            }
+        });
+        limpar.onclick = () => { campo.value = ''; filtrar(); campo.focus(); };
+    })();
 })();
