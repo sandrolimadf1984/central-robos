@@ -53,18 +53,31 @@ O painel abre por cima de qualquer portal e pode ser **arrastado para qualquer c
 |---|---|
 | Affego | Fisco e Convênios Affego |
 | Amil | Rede Credenciada Amil |
+| Assedf/Vidacard Fidelidade |
+| BRB Saude |
+| Camed Saude |
+| CNU Unimed |
+| Evo Saude |
+| Fascal |
+| Geap Saude |
 | Inas GDF | Convênios Inas GDF |
-| Medsenior / UN SEG | Planos de Saúde |
+| Medsenior |
+| PF Saude | Policia Federal |
 | Planassiste MPU | Planilhas do MPU |
 | Plenum | Convênios de Advocacia e Justiça |
-| PM / STJ | Segurança e Justiça Superior |
+| PM | Polícia Militar | 
+| Proasa |
+| STJ | Superior Tribunal de Justiça |
 | Postal (Correios) | Logística Postal |
 | Sul America | Convênios SulAmérica |
+| Serpro |
 | TJDF | Tribunal de Justiça do DF |
 | TRE | Tribunal Regional Eleitoral |
 | TRF | Tribunal Regional Federal |
 | TRT | Tribunal Regional do Trabalho |
 | TST | Tribunal Superior do Trabalho |
+| Unimed Seguros |
+| Unity Saude |
 
 Cada robô conhece a estrutura do seu portal: sabe em qual campo digitar, quando aguardar o sistema responder, como preencher a quantidade quando um código se repete, e como salvar cada item antes de passar ao próximo.
 
