@@ -2473,7 +2473,10 @@
                                 var f = d.body.children;
                                 for (var i = 0; i < f.length; i++) {
                                     if (f[i].id === 'painel-assedf-agente') continue;
-                                    t += ' ' + (f[i].innerText || f[i].textContent || '');
+                                    // textContent em vez de innerText: mesmo resultado
+                                    // para o que precisamos, sem obrigar o navegador
+                                    // a refazer o desenho da página a cada leitura.
+                                    t += ' ' + (f[i].textContent || '');
                                 }
                             } catch (e) { }
                         });
@@ -2608,6 +2611,45 @@
                         }
                     };
 
+                    // Fica escutando a tela: assim que ela muda, confere na hora.
+                    // Antes ele olhava a cada 120ms e perdia até 120ms por exame —
+                    // com 40 exames isso vira segundos jogados fora.
+                    var esperarAte = function (cond, teto) {
+                        return new Promise(function (resolve) {
+                            var pronto = false, ultimo = 0;
+                            var obs = [], iv = null, to = null;
+                            var fim = function (v) {
+                                if (pronto) return;
+                                pronto = true;
+                                obs.forEach(function (o) { try { o.disconnect(); } catch (e) { } });
+                                if (iv) clearInterval(iv);
+                                if (to) clearTimeout(to);
+                                resolve(v);
+                            };
+                            var testar = function () {
+                                if (pronto) return;
+                                var agora = Date.now();
+                                if (agora - ultimo < 30) return;    // não conferir sem parar
+                                ultimo = agora;
+                                try { if (cond()) fim(true); } catch (e) { }
+                            };
+                            try { if (cond()) return resolve(true); } catch (e) { }
+                            docs().forEach(function (d) {
+                                try {
+                                    var M = (d.defaultView && d.defaultView.MutationObserver) || MutationObserver;
+                                    var o = new M(testar);
+                                    o.observe(d.body || d.documentElement, {
+                                        childList: true, subtree: true, characterData: true,
+                                        attributes: true, attributeFilter: ['value']
+                                    });
+                                    obs.push(o);
+                                } catch (e) { }
+                            });
+                            iv = setInterval(testar, 200);          // rede de segurança
+                            to = setTimeout(function () { fim(false); }, teto);
+                        });
+                    };
+
                     var jeitoQueFunciona = -1;
 
                     var acionar = async function (linha, cod) {
@@ -2710,17 +2752,19 @@
                         // primeiro olhamos se o exame ENTROU, e só depois o aviso.
                         // Se o aviso aparecer mas o exame estiver na lista, é aviso
                         // de repetição (nós acionamos duas vezes) — não é recusa.
-                        var esperarResposta = async function (voltas) {
-                            for (var k = 0; k < voltas; k++) {
-                                await espera(220);
-                                if (!jaEstava && textoDaTela().indexOf(cod) !== -1) return 'ok';
-                                if (recusou()) {
-                                    if (textoDaTela().indexOf(cod) !== -1) { limparAviso(); return 'ok'; }
-                                    return 'recusado';
+                        var esperarResposta = async function (teto) {
+                            var resultado = null;
+                            await esperarAte(function () {
+                                var tela = textoDaTela();
+                                if (!jaEstava && tela.indexOf(cod) !== -1) { resultado = 'ok'; return true; }
+                                if (/procedimento\s+n[ãa]o\s+autorizado/i.test(tela)) {
+                                    if (tela.indexOf(cod) !== -1) { limparAviso(); resultado = 'ok'; return true; }
+                                    resultado = 'recusado'; return true;
                                 }
-                                if (entrou(linha, cod, jaEstava)) return 'ok';
-                            }
-                            return null;
+                                if (entrou(linha, cod, jaEstava)) { resultado = 'ok'; return true; }
+                                return false;
+                            }, teto);
+                            return resultado;
                         };
 
                         // Se já descobrimos qual jeito funciona neste portal, usamos
@@ -2728,7 +2772,7 @@
                         if (jeitoQueFunciona >= 0 && jeitos[jeitoQueFunciona]) {
                             instalarEscudo();
                             try { jeitos[jeitoQueFunciona](); } catch (e) { errosJS.push(e.message || 'erro'); }
-                            var rc = await esperarResposta(30);
+                            var rc = await esperarResposta(7000);    // mesmo teto de antes
                             if (rc) return rc;
                         }
 
@@ -2738,7 +2782,7 @@
                             try { jeitos[j](); } catch (e) { errosJS.push(e.message || 'erro'); }
                             // O primeiro jeito ganha uma espera bem maior: é o mais
                             // provável, e insistir cedo demais causava a duplicidade.
-                            var r = await esperarResposta(j === 0 ? 30 : 10);
+                            var r = await esperarResposta(j === 0 ? 7000 : 2500);
                             if (r) {
                                 if (r === 'ok') jeitoQueFunciona = j;
                                 return r;
@@ -2750,12 +2794,11 @@
                     // Prepara a linha: código → espera o nome → quantidade.
                     // Devolve tudo que o passo seguinte precisa.
                     var prepararLinha = async function (cod, qtd) {
-                        var linha = null;
-                        for (var t = 0; t < 40; t++) {
-                            linha = linhaLivre(t > 8);
-                            if (linha) break;
-                            await espera(300);
-                        }
+                        var linha = null, voltasLinha = 0;
+                        await esperarAte(function () {
+                            linha = linhaLivre(++voltasLinha > 20);
+                            return !!linha;
+                        }, 12000);
                         if (!linha) return null;
 
                         var jaEstava = textoDaTela().indexOf(cod) !== -1;
@@ -2763,20 +2806,20 @@
                         sair(linha.cod);
 
                         var nome = '';
-                        for (var w = 0; w < 40; w++) {
+                        await esperarAte(function () {
                             if (linha.desc && (linha.desc.value || '').trim().length > 2) {
-                                nome = linha.desc.value.trim(); break;
+                                nome = linha.desc.value.trim(); return true;
                             }
-                            var bruto = (linha.tr.innerText || linha.tr.textContent || '').replace(/\s+/g, ' ').trim();
+                            var bruto = (linha.tr.textContent || '').replace(/\s+/g, ' ').trim();
                             var limpo = bruto.split(cod).join(' ')
                                 .replace(/\b(inserir|zerar|inclui[r]?|excluir)\b/gi, ' ')
                                 .replace(/(^|\s)P(\s|$)/g, ' ')
                                 .replace(/\s+/g, ' ').trim();
-                            if (limpo.length > 4) { nome = limpo; break; }
-                            await espera(250);
-                        }
+                            if (limpo.length > 4) { nome = limpo; return true; }
+                            return false;
+                        }, 10000);
 
-                        if (linha.qtd) { escrever(linha.qtd, qtd); sair(linha.qtd); await espera(200); }
+                        if (linha.qtd) { escrever(linha.qtd, qtd); sair(linha.qtd); await espera(50); }
                         return { linha: linha, nome: nome, jaEstava: jaEstava };
                     };
 
