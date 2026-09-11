@@ -1049,6 +1049,52 @@
                 let pausado = false;
                 let painel = null;
                 let statusEl, contadorEl;
+                // ── Correção set/2026 — códigos fora do padrão (ex.: 90011910, Cistatina C)
+                //
+                // O que acontecia: quando um código desses entrava no lote, o robô
+                // parava de vez. O status ficava preso em "processando", o app nunca
+                // via "finalizado" (por isso o botão PARAR não voltava) e a página
+                // continuava travada, porque quem solta a tela é finalizar() — que
+                // nunca era chamado.
+                //
+                // Eram três buracos em sequência:
+                //
+                // 1) CLIQUE NA SOBRA DA BUSCA ANTERIOR. Quando a busca do código raro
+                //    não devolvia a linha dele, o robô caía no atalho da "linha
+                //    destacada" — que ainda era a do código ANTERIOR. Ele clicava
+                //    nela, o portal acusava duplicidade e abria um aviso por cima.
+                //    Agora a linha destacada só é aceita se for NOVA; sobra da busca
+                //    anterior é ignorada.
+                //
+                // 2) SAÍDA SEM VIGIA. Com o aviso aberto, o campo de busca
+                //    (#HandleTermo) some da tela, e a função voltava dali sem deixar
+                //    nada marcado para tentar de novo. A partir dali só um movimento
+                //    na página reacenderia o robô; com a tela parada, nada mais
+                //    acontecia. Agora o robô espera o campo voltar, solta a tela e,
+                //    se não voltar, pula SÓ aquele código.
+                //
+                // 3) NENHUM TEMPO LIMITE. Se a tabela do portal nunca aparecesse, o
+                //    robô esperava para sempre. Agora cada código tem um vigia (repete
+                //    a busca uma vez, depois pula e anota) e existe um marca-passo
+                //    geral: nenhum código prende a fila por mais de 30 s. No fim,
+                //    finalizar() SEMPRE roda — é ele que devolve o botão e solta a tela.
+                let vigia = null;        // temporizador do código atual
+                let timerQtd = null;     // intervalo do preenchimento de quantidade
+                let tentativa = 0;       // 0 = 1ª tentativa; 1 = já repetiu a busca
+                let ultimaChecagem = 0;  // limita a frequência da checagem da lista
+                let colocados = 0;       // quantos itens realmente entraram no portal
+                let finalizado = false;
+                let marcaPasso = null;   // batimento geral: impede travar para sempre
+                let passoAtual = -1;     // qual posição da fila está em andamento
+                let passoDesde = 0;      // desde quando ela está em andamento
+                let semCampo = 0;        // quantas vezes seguidas o campo sumiu
+                let destaqueAntes = '';  // linha destacada ANTES desta busca
+                let codAnterior = '';    // código do item anterior
+                const naoEntraram = [];  // códigos que o portal não aceitou
+                const diagnostico = [];  // o que o portal mostrava na hora da falha
+                const ESPERA_REPETIR = 7000;
+                const ESPERA_DESISTIR = 8000;
+                const LIMITE_DO_PASSO = 30000; // teto de tempo por código
                 const criarPainelEntrada = () => {
                     painel = document.createElement('div');
                     painel.id = 'b403-painel-root';
@@ -1073,16 +1119,18 @@
                     statusEl = painel.querySelector('#b403-status');
                     contadorEl = painel.querySelector('#b403-contador');
                     painel.querySelector('#b403-pausar').onclick = togglePause;
-                    painel.querySelector('#b403-pular').onclick = () => { executando = false; avancarProximo(); };
+                    painel.querySelector('#b403-pular').onclick = () => avancarProximo();
                     painel.querySelector('#b403-encerrar').onclick = finalizar;
                     observer = new MutationObserver(() => !pausado && executarProximo());
                     observer.observe(document.body, { childList: true, subtree: true });
+                    iniciarMarcaPasso();
                     executarProximo();
                 };
-                const setStatus = t => statusEl.textContent = 'Status: ' + t;
-                const setContador = () => contadorEl.textContent = idx + ' / ' + codigos.length;
+                const setStatus = t => { if (statusEl) statusEl.textContent = 'Status: ' + t; };
+                const setContador = () => { if (contadorEl) contadorEl.textContent = idx + ' / ' + codigos.length; };
                 const togglePause = () => {
                     pausado = !pausado;
+                    passoDesde = Date.now();
                     setStatus(pausado ? 'pausado' : 'retomado');
                     if (!pausado) executarProximo();
                 };
@@ -1095,6 +1143,119 @@
                         }, 100);
                     });
                     input.dataset.enterAdded = '1';
+                };
+                const soDigitos = t => (t || '').replace(/\D/g, '');
+                // Acha o bloco do item DESTE código na lista de escolhidos do portal.
+                // Serve também para saber se o portal aceitou o item sozinho.
+                const blocoDoCodigo = cod => {
+                    if (!cod) return null;
+                    const blocos = document.querySelectorAll('#stepDadosSolicitacaoForm > bc-guia-eventos-exibicao-termos-selecionados > div > div');
+                    for (const b of blocos) {
+                        const txt = (b.innerText || b.textContent || '');
+                        if (txt.indexOf(cod) !== -1 || soDigitos(txt).indexOf(cod) !== -1) return b;
+                    }
+                    return null;
+                };
+                const jaEstaNaLista = cod => !!blocoDoCodigo(cod);
+                const pararEspera = () => {
+                    if (obsTabelaAtual) { obsTabelaAtual.disconnect(); obsTabelaAtual = null; }
+                    if (vigia) { clearTimeout(vigia); vigia = null; }
+                };
+                // Guarda o que o portal estava mostrando quando o código não entrou.
+                // É a única janela para a realidade quando algo falha no portal de verdade.
+                const fotografarPortal = cod => {
+                    const linhas = document.querySelectorAll('#result-body-table > tr');
+                    const amostra = [];
+                    let linhasComEsteCodigo = 0;
+                    linhas.forEach((tr, i) => {
+                        const t = (tr.innerText || tr.textContent || '').replace(/\s+/g, ' ').trim();
+                        if (cod && (t.indexOf(cod) !== -1 || soDigitos(t).indexOf(cod) !== -1)) linhasComEsteCodigo++;
+                        if (i < 5) amostra.push(t.slice(0, 140));
+                    });
+                    const avisos = [];
+                    document.querySelectorAll('.modal.in, .modal.show, .alert, .toast, [role="alert"]').forEach(m => {
+                        const t = (m.innerText || m.textContent || '').replace(/\s+/g, ' ').trim();
+                        if (t) avisos.push(t.slice(0, 200));
+                    });
+                    const campo = document.querySelector('#HandleTermo');
+                    return {
+                        codigo: cod,
+                        linhasNaTabela: linhas.length,
+                        linhasComEsteCodigo: linhasComEsteCodigo,
+                        campoDeBusca: campo ? campo.value : '(campo sumiu da tela)',
+                        campoExiste: !!campo,
+                        jaEstavaNaLista: jaEstaNaLista(cod),
+                        avisos: avisos,
+                        primeirasLinhas: amostra
+                    };
+                };
+                const anotarFalha = cod => {
+                    if (!cod || naoEntraram.indexOf(cod) !== -1) return;
+                    naoEntraram.push(cod);
+                    diagnostico.push(fotografarPortal(cod));
+                };
+                // Solta a página quando um aviso do portal ficou preso na frente.
+                // Só mexe no fundo escuro e no travamento de rolagem/cliques —
+                // nunca clica em botão do portal, para não confirmar nada sozinho.
+                const soltarTela = () => {
+                    try { document.querySelectorAll('.modal-backdrop').forEach(b => b.remove()); } catch (e) { }
+                    try { document.body.classList.remove('modal-open'); } catch (e) { }
+                    try { document.body.style.pointerEvents = 'auto'; } catch (e) { }
+                    try { document.body.style.overflow = 'auto'; } catch (e) { }
+                };
+                // O vigia é o que impede o travamento: nenhum código pode ficar
+                // esperando para sempre.
+                const armarVigia = (cod, ms) => {
+                    if (vigia) clearTimeout(vigia);
+                    vigia = setTimeout(() => {
+                        vigia = null;
+                        if (finalizado) return;
+                        if (pausado) { armarVigia(cod, 1500); return; }
+                        // 1) O portal pode ter aceitado o item sem mostrar a tabela de busca
+                        if (jaEstaNaLista(cod)) {
+                            pararEspera();
+                            setStatus('aceito sem tabela: ' + cod);
+                            verificarEPreencherQuantidade();
+                            return;
+                        }
+                        // 2) Primeira falha: repete só a BUSCA. Não adiciona nada,
+                        //    então não há risco de duplicidade.
+                        if (tentativa === 0) {
+                            tentativa = 1;
+                            setStatus('sem resposta — repetindo ' + cod);
+                            digitarCodigo(cod);
+                            armarVigia(cod, ESPERA_DESISTIR);
+                            return;
+                        }
+                        // 3) Continua sem resposta: pula SÓ este código e segue a fila
+                        pararEspera();
+                        anotarFalha(cod);
+                        setStatus('o portal não aceitou ' + cod + ' — seguindo');
+                        avancarProximo();
+                    }, ms);
+                };
+                // Marca-passo: rede de segurança geral. Mesmo que algo inesperado
+                // aconteça no portal, nenhum código segura a fila para sempre e o
+                // robô sempre chega em finalizar() — que é quem devolve o botão
+                // ao app e solta a página.
+                const iniciarMarcaPasso = () => {
+                    if (marcaPasso) clearInterval(marcaPasso);
+                    passoAtual = idx;
+                    passoDesde = Date.now();
+                    marcaPasso = setInterval(() => {
+                        if (finalizado) { clearInterval(marcaPasso); marcaPasso = null; return; }
+                        if (pausado) { passoDesde = Date.now(); return; }
+                        if (idx >= codigos.length) { finalizar(); return; }
+                        if (idx !== passoAtual) { passoAtual = idx; passoDesde = Date.now(); return; }
+                        if (Date.now() - passoDesde < LIMITE_DO_PASSO) return;
+                        const cod = (codigos[idx] || {}).cod || '';
+                        pararEspera();
+                        if (timerQtd) { clearInterval(timerQtd); timerQtd = null; }
+                        if (cod && !jaEstaNaLista(cod)) anotarFalha(cod);
+                        setStatus('destravando em ' + cod);
+                        soltarTela();
+                        avancarProximo();
+                    }, 2000);
                 };
                 const selecionarTabelaTJDF = () => {
                     setStatus('aguardando tabela');
@@ -1110,27 +1271,73 @@
                                     if (celula) break;
                                 }
                             }
+                            // Só quando a busca acima não achou nada: alguns códigos vêm
+                            // formatados na tela (ponto, traço, espaço).
+                            if (!celula) {
+                                for (const tr of document.querySelectorAll('#result-body-table > tr')) {
+                                    if (soDigitos(tr.innerText || tr.textContent || '').includes(codTJ)) {
+                                        celula = tr.querySelector('td:nth-child(2)');
+                                        if (celula) break;
+                                    }
+                                }
+                            }
                         }
-                        if (!celula) celula = document.querySelector('#result-body-table > tr.dataGridRow.ng-scope.kb-active > td:nth-child(2)');
+                        // Atalho da linha destacada: continua valendo, mas SÓ se ela for
+                        // nova. Se for a sobra da busca anterior, clicar nela adicionava
+                        // o exame errado, o portal acusava duplicidade e era aí que tudo
+                        // travava. Sobra é ignorada — o vigia resolve o código.
+                        if (!celula) {
+                            const trDestaque = document.querySelector('#result-body-table > tr.dataGridRow.ng-scope.kb-active');
+                            if (trDestaque) {
+                                const txtDestaque = (trDestaque.innerText || trDestaque.textContent || '').replace(/\s+/g, ' ').trim();
+                                const ehSobra = (!!txtDestaque && txtDestaque === destaqueAntes) ||
+                                    (!!codAnterior && (txtDestaque.indexOf(codAnterior) !== -1 || soDigitos(txtDestaque).indexOf(codAnterior) !== -1));
+                                if (!ehSobra) celula = trDestaque.querySelector('td:nth-child(2)');
+                            }
+                        }
                         if (celula) {
                             celula.click();
-                            obsTabelaAtual.disconnect();
-                            obsTabelaAtual = null;
+                            pararEspera();
                             verificarEPreencherQuantidade();
+                            return;
+                        }
+                        // Nada clicável na tabela: o portal pode ter adicionado o item
+                        // sozinho. Checagem espaçada para não pesar na página.
+                        const agora = Date.now();
+                        if (codTJ && agora - ultimaChecagem > 600) {
+                            ultimaChecagem = agora;
+                            if (jaEstaNaLista(codTJ)) {
+                                pararEspera();
+                                setStatus('aceito sem tabela: ' + codTJ);
+                                verificarEPreencherQuantidade();
+                            }
                         }
                     });
                     obsTabelaAtual.observe(document.body, { childList: true, subtree: true });
                 };
                 const verificarEPreencherQuantidade = () => {
                     const itemAtual = codigos[idx];
+                    if (!itemAtual) { avancarProximo(); return; }
+                    colocados++; // este item entrou na lista do portal
                     if (itemAtual.qtd > 1) {
                         setStatus('preenchendo qtd (' + itemAtual.qtd + ')');
                         let tentativas = 0;
-                        const checarInput = setInterval(() => {
-                            const seletor = '#stepDadosSolicitacaoForm > bc-guia-eventos-exibicao-termos-selecionados > div > div:nth-child(' + (idx + 1) + ') > div.form-group > div.size-1.no-rpadding > input';
-                            const inputQtd = document.querySelector(seletor);
+                        if (timerQtd) clearInterval(timerQtd);
+                        timerQtd = setInterval(() => {
+                            if (finalizado) { clearInterval(timerQtd); timerQtd = null; return; }
+                            // Procura primeiro o bloco DESTE código: é o alvo certo mesmo
+                            // que a contagem de posição tenha saído do lugar por causa de
+                            // um código pulado. A posição fica como reserva.
+                            let inputQtd = null;
+                            const bloco = blocoDoCodigo(itemAtual.cod);
+                            if (bloco) inputQtd = bloco.querySelector('div.form-group > div.size-1.no-rpadding > input');
+                            if (!inputQtd) {
+                                const seletor = '#stepDadosSolicitacaoForm > bc-guia-eventos-exibicao-termos-selecionados > div > div:nth-child(' + colocados + ') > div.form-group > div.size-1.no-rpadding > input';
+                                inputQtd = document.querySelector(seletor);
+                            }
                             if (inputQtd) {
-                                clearInterval(checarInput);
+                                clearInterval(timerQtd);
+                                timerQtd = null;
                                 inputQtd.value = itemAtual.qtd;
                                 inputQtd.dispatchEvent(new Event('input', { bubbles: true }));
                                 inputQtd.dispatchEvent(new Event('change', { bubbles: true }));
@@ -1138,8 +1345,9 @@
                             } else {
                                 tentativas++;
                                 if (tentativas > 20) {
-                                    clearInterval(checarInput);
-                                    console.warn('Campo de quantidade não apareceu a tempo.');
+                                    clearInterval(timerQtd);
+                                    timerQtd = null;
+                                    console.warn('[TJDF] Campo de quantidade não apareceu a tempo para ' + itemAtual.cod + '.');
                                     avancarProximo();
                                 }
                             }
@@ -1149,64 +1357,142 @@
                     }
                 };
                 const avancarProximo = () => {
+                    // Desligar o que sobrou do código anterior evita que um observador
+                    // velho clique em alguma coisa durante o próximo código.
+                    pararEspera();
+                    if (timerQtd) { clearInterval(timerQtd); timerQtd = null; }
+                    const atual = codigos[idx];
+                    if (atual && atual.cod) codAnterior = atual.cod;
                     executando = false;
+                    tentativa = 0;
+                    semCampo = 0;
                     idx++;
+                    passoAtual = idx;
+                    passoDesde = Date.now();
                     executarProximo();
                 };
+                const digitarCodigo = cod => {
+                    const c = document.querySelector('#HandleTermo');
+                    if (!c) return false;
+                    c.focus();
+                    c.value = cod;
+                    c.dispatchEvent(new Event('paste', { bubbles: true }));
+                    c.dispatchEvent(new Event('input', { bubbles: true }));
+                    c.dispatchEvent(new Event('change', { bubbles: true }));
+                    return true;
+                };
                 const executarProximo = () => {
-                    if (pausado || executando) return;
+                    if (finalizado || pausado || executando) return;
                     if (idx >= codigos.length) {
                         finalizar();
                         return;
                     }
+                    const codigoAtual = codigos[idx].cod;
                     const c = document.querySelector('#HandleTermo');
-                    if (!c) return;
+                    if (!c) {
+                        // AQUI ESTAVA O TRAVAMENTO. Antes o robô voltava daqui sem
+                        // deixar nada marcado: com a tela parada, ninguém mais o
+                        // reacendia, o app nunca via "finalizado" e a página ficava
+                        // presa. Agora ele espera o campo voltar, solta a tela e, se
+                        // nada resolver, pula SÓ este código e segue.
+                        semCampo++;
+                        setStatus('campo de busca sumiu — esperando a tela voltar');
+                        if (semCampo === 4) {
+                            try {
+                                document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', keyCode: 27, which: 27, bubbles: true }));
+                            } catch (e) { }
+                        }
+                        if (semCampo >= 7) soltarTela();
+                        if (semCampo > 12) {
+                            anotarFalha(codigoAtual);
+                            setStatus('a tela não voltou em ' + codigoAtual + ' — seguindo');
+                            avancarProximo();
+                            return;
+                        }
+                        setTimeout(() => { if (!finalizado) executarProximo(); }, 700);
+                        return;
+                    }
+                    semCampo = 0;
                     executando = true;
+                    passoAtual = idx;
+                    passoDesde = Date.now();
                     setStatus('processando');
                     setContador();
+                    // Fotografa a linha que JÁ estava destacada, para não confundir a
+                    // sobra da busca anterior com o resultado desta busca.
+                    const trAntes = document.querySelector('#result-body-table > tr.dataGridRow.ng-scope.kb-active');
+                    destaqueAntes = trAntes ? (trAntes.innerText || trAntes.textContent || '').replace(/\s+/g, ' ').trim() : '';
                     adicionarEventoEnterAoInput();
-                    const codigoAtual = codigos[idx].cod;
                     if (codigoAtual !== '40325024') {
                         selecionarTabelaTJDF();
+                        armarVigia(codigoAtual, ESPERA_REPETIR);
                     }
-                    c.focus();
-                    c.value = codigoAtual;
-                    c.dispatchEvent(new Event('paste', { bubbles: true }));
-                    c.dispatchEvent(new Event('input', { bubbles: true }));
-                    c.dispatchEvent(new Event('change', { bubbles: true }));
+                    digitarCodigo(codigoAtual);
                     if (codigoAtual === '40325024') {
                         setTimeout(() => {
-                            verificarEPreencherQuantidade();
+                            if (!finalizado) verificarEPreencherQuantidade();
                         }, 600);
                     }
                 };
                 const finalizar = () => {
+                    if (finalizado) return;
+                    finalizado = true;
                     pausado = true;
                     executando = false;
                     if (observer) observer.disconnect();
-                    if (obsTabelaAtual) obsTabelaAtual.disconnect();
-                    setStatus('finalizado');
-                    document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
-                    document.querySelectorAll('.modal').forEach(m => {
-                        m.style.display = 'none';
-                        m.classList.remove('in', 'show');
-                        m.removeAttribute('aria-hidden');
-                        m.removeAttribute('inert');
-                    });
-                    document.body.classList.remove('modal-open');
-                    document.body.style.pointerEvents = 'auto';
-                    document.body.style.overflow = 'auto';
-                    try { document.activeElement.blur(); } catch (e) {}
-                    const btnFechar = document.createElement('button');
-                    btnFechar.textContent = '🧹 Fechar painel';
-                    btnFechar.style = 'margin-top:10px;width:100%;padding:8px;border:none;border-radius:8px;background:#444;color:#fff;cursor:pointer;';
-                    btnFechar.onclick = () => {
-                        painel.remove();
-                        painel = null;
-                        document.body.style.pointerEvents = 'auto';
-                        document.body.style.overflow = 'auto';
-                    };
-                    painel.appendChild(btnFechar);
+                    if (obsTabelaAtual) { obsTabelaAtual.disconnect(); obsTabelaAtual = null; }
+                    if (vigia) { clearTimeout(vigia); vigia = null; }
+                    if (timerQtd) { clearInterval(timerQtd); timerQtd = null; }
+                    if (marcaPasso) { clearInterval(marcaPasso); marcaPasso = null; }
+                    if (naoEntraram.length) {
+                        // Esta frase é o que o app mostra no painel ao terminar,
+                        // por isso o aviso vai aqui e não só no console.
+                        const d = diagnostico[0] || {};
+                        const pista = (d.avisos && d.avisos[0])
+                            ? ' | portal disse: ' + d.avisos[0].slice(0, 90)
+                            : (d.campoExiste === false
+                                ? ' | o campo de busca tinha sumido da tela'
+                                : ' | a busca devolveu ' + (d.linhasNaTabela || 0) + ' linha(s)');
+                        setStatus('⚠️ FIM — ' + colocados + ' de ' + codigos.length +
+                            ' entraram. NÃO ENTRARAM: ' + naoEntraram.join(', ') +
+                            ' (lance à mão)' + pista);
+                        try {
+                            window.__tjdfDiagnostico = diagnostico;
+                            console.warn('[TJDF] Códigos que o portal não aceitou:', naoEntraram.join(', '));
+                            console.warn('[TJDF] O que o portal mostrava na hora:', diagnostico);
+                        } catch (e) { }
+                    } else {
+                        setStatus('finalizado');
+                    }
+                    // A limpeza da tela vai em try/catch: se uma parte falhar, as
+                    // outras ainda rodam e a página não fica travada.
+                    try { document.querySelectorAll('.modal-backdrop').forEach(b => b.remove()); } catch (e) { }
+                    try {
+                        document.querySelectorAll('.modal').forEach(m => {
+                            m.style.display = 'none';
+                            m.classList.remove('in', 'show');
+                            m.removeAttribute('aria-hidden');
+                            m.removeAttribute('inert');
+                        });
+                    } catch (e) { }
+                    try { document.body.classList.remove('modal-open'); } catch (e) { }
+                    try { document.body.style.pointerEvents = 'auto'; } catch (e) { }
+                    try { document.body.style.overflow = 'auto'; } catch (e) { }
+                    try { document.activeElement.blur(); } catch (e) { }
+                    try {
+                        if (painel) {
+                            const btnFechar = document.createElement('button');
+                            btnFechar.textContent = '🧹 Fechar painel';
+                            btnFechar.style = 'margin-top:10px;width:100%;padding:8px;border:none;border-radius:8px;background:#444;color:#fff;cursor:pointer;';
+                            btnFechar.onclick = () => {
+                                if (painel) painel.remove();
+                                painel = null;
+                                document.body.style.pointerEvents = 'auto';
+                                document.body.style.overflow = 'auto';
+                            };
+                            painel.appendChild(btnFechar);
+                        }
+                    } catch (e) { }
                 };
                 criarPainelEntrada();
             })();
