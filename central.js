@@ -1090,7 +1090,9 @@
                 let semCampo = 0;        // quantas vezes seguidas o campo sumiu
                 let destaqueAntes = '';  // linha destacada ANTES desta busca
                 let codAnterior = '';    // código do item anterior
+                let itensAntesDaBusca = 0; // itens na lista antes de buscar este código
                 const naoEntraram = [];  // códigos que o portal não aceitou
+                const conferir = [];     // códigos que podem ter entrado sem o robô ver
                 const diagnostico = [];  // o que o portal mostrava na hora da falha
                 const ESPERA_REPETIR = 7000;
                 const ESPERA_DESISTIR = 8000;
@@ -1145,18 +1147,84 @@
                     input.dataset.enterAdded = '1';
                 };
                 const soDigitos = t => (t || '').replace(/\D/g, '');
-                // Acha o bloco do item DESTE código na lista de escolhidos do portal.
-                // Serve também para saber se o portal aceitou o item sozinho.
+                // ── Correção set/2026 — 3ª rodada: o exame entrando duas vezes ───
+                // A Cistatina C ENTRAVA na lista, mas o robô não conseguia vê-la:
+                // ele procurava os itens escolhidos por um caminho fixo da tela, e o
+                // portal desenha esse tipo de código em outro lugar. Sem enxergar,
+                // o robô repetia a busca — e a repetição lançava o exame de novo.
+                // Agora a conferência é feita de três jeitos independentes.
+                const areaDaLista = () => document.querySelector('#stepDadosSolicitacaoForm');
+                const foraDoPortal = el => !!(el.closest('#b403-painel-root') ||
+                    el.closest('#menu-central-robos') || el.closest('#result-body-table'));
+                // Cada exame já escolhido tem uma caixinha de quantidade do lado.
+                const caixasDeQuantidade = () => {
+                    const area = areaDaLista() || document.body;
+                    if (!area) return [];
+                    return Array.from(area.querySelectorAll('div.size-1.no-rpadding > input'))
+                        .filter(i => !foraDoPortal(i));
+                };
+                const contarItensDaLista = () => caixasDeQuantidade().length;
+                // Texto da área dos exames escolhidos, PULANDO a tabela de busca, o
+                // painel do robô e o painel do app — senão o próprio código colado
+                // seria confundido com um exame já lançado.
+                const textoDaListaContem = cod => {
+                    const area = areaDaLista();
+                    if (!area || !cod) return false;
+                    const pular = ['#result-body-table', '#b403-painel-root', '#menu-central-robos']
+                        .map(s => document.querySelector(s)).filter(Boolean);
+                    let txt = '';
+                    const andar = no => {
+                        if (!no) return;
+                        if (pular.indexOf(no) !== -1) return;
+                        if (no.nodeType === 3) { txt += no.nodeValue; return; }
+                        if (no.nodeType !== 1) return;
+                        const filhos = no.childNodes;
+                        for (let i = 0; i < filhos.length; i++) andar(filhos[i]);
+                    };
+                    andar(area);
+                    return txt.indexOf(cod) !== -1 || soDigitos(txt).indexOf(cod) !== -1;
+                };
+                // Acha a LINHA deste código, subindo a partir da caixinha de
+                // quantidade. Para de subir assim que o pedaço deixa de ser de um
+                // item só — assim a quantidade nunca cai no exame errado.
                 const blocoDoCodigo = cod => {
                     if (!cod) return null;
+                    const limite = areaDaLista();
+                    const tabelaBusca = document.querySelector('#result-body-table');
+                    for (const inp of caixasDeQuantidade()) {
+                        let el = inp;
+                        for (let n = 0; n < 7 && el && el.parentElement; n++) {
+                            el = el.parentElement;
+                            // Parar de subir ao sair da linha do item. Sem estes freios
+                            // a subida chegava até o corpo da página e o texto da TABELA
+                            // DE BUSCA entrava na conta — o robô então achava que o
+                            // código já estava lançado e deixava de clicar nele.
+                            if (el === limite || el === document.body || el === document.documentElement) break;
+                            if (tabelaBusca && el.contains(tabelaBusca)) break;
+                            if (el.querySelectorAll('div.size-1.no-rpadding > input').length !== 1) break;
+                            const txt = el.textContent || '';
+                            if (txt.indexOf(cod) !== -1 || soDigitos(txt).indexOf(cod) !== -1) return el;
+                        }
+                    }
+                    // Reserva: o caminho antigo, que serve para os exames comuns.
                     const blocos = document.querySelectorAll('#stepDadosSolicitacaoForm > bc-guia-eventos-exibicao-termos-selecionados > div > div');
                     for (const b of blocos) {
-                        const txt = (b.innerText || b.textContent || '');
+                        const txt = (b.textContent || '');
                         if (txt.indexOf(cod) !== -1 || soDigitos(txt).indexOf(cod) !== -1) return b;
                     }
                     return null;
                 };
-                const jaEstaNaLista = cod => !!blocoDoCodigo(cod);
+                const jaEstaNaLista = cod => !!blocoDoCodigo(cod) || textoDaListaContem(cod);
+                // Repetir a busca é o que lançava o exame duas vezes. Agora só repete
+                // quando há certeza de que nada entrou: o código não está na lista E a
+                // quantidade de itens não mudou. Na dúvida, o robô prefere deixar o
+                // código de fora e avisar, a arriscar lançar duplicado.
+                const podeRepetirBusca = cod => {
+                    if (!areaDaLista()) return false;
+                    if (jaEstaNaLista(cod)) return false;
+                    if (contarItensDaLista() !== itensAntesDaBusca) return false;
+                    return true;
+                };
                 const pararEspera = () => {
                     if (obsTabelaAtual) { obsTabelaAtual.disconnect(); obsTabelaAtual = null; }
                     if (vigia) { clearTimeout(vigia); vigia = null; }
@@ -1172,8 +1240,16 @@
                         if (cod && (t.indexOf(cod) !== -1 || soDigitos(t).indexOf(cod) !== -1)) linhasComEsteCodigo++;
                         if (i < 5) amostra.push(t.slice(0, 140));
                     });
+                    // Separa a JANELA DE AVISO de verdade do recado fixo da página.
+                    // O texto sobre OPME, por exemplo, fica sempre lá e não tem nada a
+                    // ver com o exame — ele estava sendo mostrado como se fosse a causa.
+                    const avisosDaJanela = [];
+                    document.querySelectorAll('.modal.in, .modal.show').forEach(m => {
+                        const t = (m.innerText || m.textContent || '').replace(/\s+/g, ' ').trim();
+                        if (t) avisosDaJanela.push(t.slice(0, 200));
+                    });
                     const avisos = [];
-                    document.querySelectorAll('.modal.in, .modal.show, .alert, .toast, [role="alert"]').forEach(m => {
+                    document.querySelectorAll('.alert, .toast, [role="alert"]').forEach(m => {
                         const t = (m.innerText || m.textContent || '').replace(/\s+/g, ' ').trim();
                         if (t) avisos.push(t.slice(0, 200));
                     });
@@ -1185,13 +1261,21 @@
                         campoDeBusca: campo ? campo.value : '(campo sumiu da tela)',
                         campoExiste: !!campo,
                         jaEstavaNaLista: jaEstaNaLista(cod),
-                        avisos: avisos,
+                        itensNaListaAntes: itensAntesDaBusca,
+                        itensNaListaAgora: contarItensDaLista(),
+                        avisosDaJanela: avisosDaJanela,
+                        recadosFixosDaPagina: avisos,
                         primeirasLinhas: amostra
                     };
                 };
                 const anotarFalha = cod => {
-                    if (!cod || naoEntraram.indexOf(cod) !== -1) return;
-                    naoEntraram.push(cod);
+                    if (!cod || naoEntraram.indexOf(cod) !== -1 || conferir.indexOf(cod) !== -1) return;
+                    // Se a lista mudou de tamanho enquanto este código era processado,
+                    // ele PODE ter entrado sem o robô conseguir enxergar. Nesse caso o
+                    // atendente é mandado CONFERIR, não lançar à mão — lançar à mão aí
+                    // é que criaria a duplicidade.
+                    if (areaDaLista() && contarItensDaLista() !== itensAntesDaBusca) conferir.push(cod);
+                    else naoEntraram.push(cod);
                     diagnostico.push(fotografarPortal(cod));
                 };
                 // Solta a página quando um aviso do portal ficou preso na frente.
@@ -1214,13 +1298,14 @@
                         // 1) O portal pode ter aceitado o item sem mostrar a tabela de busca
                         if (jaEstaNaLista(cod)) {
                             pararEspera();
-                            setStatus('aceito sem tabela: ' + cod);
+                            setStatus('aceito pelo portal: ' + cod);
                             verificarEPreencherQuantidade();
                             return;
                         }
-                        // 2) Primeira falha: repete só a BUSCA. Não adiciona nada,
-                        //    então não há risco de duplicidade.
-                        if (tentativa === 0) {
+                        // 2) Primeira falha: repete só a BUSCA — e SÓ quando há certeza
+                        //    de que nada entrou. Sem essa certeza, a repetição lançava
+                        //    o exame duas vezes (foi o caso da Cistatina C).
+                        if (tentativa === 0 && podeRepetirBusca(cod)) {
                             tentativa = 1;
                             setStatus('sem resposta — repetindo ' + cod);
                             digitarCodigo(cod);
@@ -1296,6 +1381,14 @@
                             }
                         }
                         if (celula) {
+                            // Conferência final antes de clicar: se o item já está na
+                            // lista, clicar de novo é o que criava a duplicidade.
+                            if (codTJ && jaEstaNaLista(codTJ)) {
+                                pararEspera();
+                                setStatus('aceito pelo portal: ' + codTJ);
+                                verificarEPreencherQuantidade();
+                                return;
+                            }
                             celula.click();
                             pararEspera();
                             verificarEPreencherQuantidade();
@@ -1418,6 +1511,10 @@
                     passoDesde = Date.now();
                     setStatus('processando');
                     setContador();
+                    // Quantos exames já estavam na lista ANTES de buscar este código.
+                    // Se esse número mudar, o portal mexeu na lista — e aí o robô não
+                    // pode repetir a busca, sob risco de lançar o exame duas vezes.
+                    itensAntesDaBusca = contarItensDaLista();
                     // Fotografa a linha que JÁ estava destacada, para não confundir a
                     // sobra da busca anterior com o resultado desta busca.
                     const trAntes = document.querySelector('#result-body-table > tr.dataGridRow.ng-scope.kb-active');
@@ -1444,21 +1541,28 @@
                     if (vigia) { clearTimeout(vigia); vigia = null; }
                     if (timerQtd) { clearInterval(timerQtd); timerQtd = null; }
                     if (marcaPasso) { clearInterval(marcaPasso); marcaPasso = null; }
-                    if (naoEntraram.length) {
+                    if (naoEntraram.length || conferir.length) {
                         // Esta frase é o que o app mostra no painel ao terminar,
                         // por isso o aviso vai aqui e não só no console.
                         const d = diagnostico[0] || {};
-                        const pista = (d.avisos && d.avisos[0])
-                            ? ' | portal disse: ' + d.avisos[0].slice(0, 90)
+                        const pista = (d.avisosDaJanela && d.avisosDaJanela[0])
+                            ? ' | a janela do portal dizia: ' + d.avisosDaJanela[0].slice(0, 90)
                             : (d.campoExiste === false
                                 ? ' | o campo de busca tinha sumido da tela'
                                 : ' | a busca devolveu ' + (d.linhasNaTabela || 0) + ' linha(s)');
-                        setStatus('⚠️ FIM — ' + colocados + ' de ' + codigos.length +
-                            ' entraram. NÃO ENTRARAM: ' + naoEntraram.join(', ') +
-                            ' (lance à mão)' + pista);
+                        let msg = '⚠️ FIM — ' + colocados + ' de ' + codigos.length + ' entraram.';
+                        if (naoEntraram.length) {
+                            msg += ' NÃO ENTRARAM: ' + naoEntraram.join(', ') + ' (lance à mão).';
+                        }
+                        if (conferir.length) {
+                            msg += ' CONFIRA NA TELA: ' + conferir.join(', ') +
+                                ' (pode já estar lançado — não lance de novo sem olhar).';
+                        }
+                        setStatus(msg + pista);
                         try {
                             window.__tjdfDiagnostico = diagnostico;
                             console.warn('[TJDF] Códigos que o portal não aceitou:', naoEntraram.join(', '));
+                            if (conferir.length) console.warn('[TJDF] Códigos para conferir na tela:', conferir.join(', '));
                             console.warn('[TJDF] O que o portal mostrava na hora:', diagnostico);
                         } catch (e) { }
                     } else {
