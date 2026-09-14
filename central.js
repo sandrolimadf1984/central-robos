@@ -4171,6 +4171,335 @@
                 alert("Finalizado! Foram inseridos " + order.length + " códigos únicos na AFFEGO.");
             })();
         },
+        "SAMP": () => {
+            (() => {
+                if (document.getElementById('samp-painel-root')) return;
+                // ── ROBÔ SAMP AGMP (set/2026) ─────────────────────────────────
+                // Portal: samp.org.br/prestador/procedimento.php
+                //
+                // Como a tela funciona: existe um quadro "Procedimentos" com
+                // cinco linhas prontas. Cada linha tem Código, Descrição e
+                // Quantidade. Ao digitar o código e SAIR do campo, o portal
+                // preenche a descrição sozinho. Quando as cinco acabam, o botão
+                // "+ Adicionar Procedimento" cria mais uma.
+                //
+                // As linhas são achadas pela POSIÇÃO na tela, e não por nomes
+                // internos do portal: os campos visíveis são agrupados por
+                // altura, e vale o grupo que tiver a caixinha de quantidade na
+                // ponta direita. Assim o robô continua funcionando se o SAMP
+                // trocar nomes de campo ou mexer no leiaute.
+                let codigos = [];
+                let idx = 0;
+                let colocados = 0;
+                let pausado = false;
+                let finalizado = false;
+                let trabalhando = false;
+                let painel = null, statusEl = null, contadorEl = null;
+                let vigia = null;
+                let marcaPasso = null;
+                let passoAtual = -1, passoDesde = 0;
+                let tentativasLinha = 0;
+                const naoEntraram = [];
+                const diagnostico = [];
+                const ESPERA_DESCRICAO = 9000;
+                const LIMITE_DO_PASSO = 30000;
+
+                const setStatus = t => { if (statusEl) statusEl.textContent = 'Status: ' + t; };
+                const setContador = () => { if (contadorEl) contadorEl.textContent = idx + ' / ' + codigos.length; };
+
+                const visivel = el => {
+                    if (!el) return false;
+                    const r = el.getBoundingClientRect();
+                    return r.width > 0 && r.height > 0;
+                };
+
+                const camposVisiveis = () => {
+                    const fora = ['hidden', 'checkbox', 'radio', 'submit', 'button', 'image', 'file', 'reset'];
+                    return Array.prototype.slice.call(document.querySelectorAll('input')).filter(i => {
+                        if (i.disabled || i.readOnly && false) return false;
+                        if (fora.indexOf((i.type || 'text').toLowerCase()) !== -1) return false;
+                        if (i.closest('#samp-painel-root')) return false;
+                        if (i.closest('#menu-central-robos')) return false;
+                        return visivel(i);
+                    });
+                };
+
+                // O botão que cria mais uma linha. Pega o elemento MAIS INTERNO
+                // que tem esse texto: a célula em volta também casa com a busca
+                // e clicar nela não faz nada.
+                const botaoAdicionar = () => {
+                    const achados = [];
+                    const todos = document.querySelectorAll('button, a, span, div, td, input[type=button], input[type=submit]');
+                    for (let i = 0; i < todos.length; i++) {
+                        const el = todos[i];
+                        const txt = ((el.textContent || '') + ' ' + (el.value || '')).replace(/\s+/g, ' ').trim().toLowerCase();
+                        if (txt.indexOf('adicionar procedimento') === -1) continue;
+                        if (!visivel(el)) continue;
+                        achados.push(el);
+                    }
+                    if (!achados.length) return null;
+                    achados.sort((a, b) => (a.textContent || '').length - (b.textContent || '').length);
+                    return achados[0];
+                };
+
+                // Agrupa os campos por altura na tela. Cada grupo é uma linha.
+                const linhasDeProcedimento = () => {
+                    const botao = botaoAdicionar();
+                    const limite = botao ? botao.getBoundingClientRect().top + window.scrollY + 4 : Infinity;
+                    const campos = camposVisiveis().map(el => {
+                        const r = el.getBoundingClientRect();
+                        return { el: el, topo: r.top + window.scrollY, esq: r.left + window.scrollX };
+                    }).filter(c => c.topo < limite);
+                    campos.sort((a, b) => (a.topo - b.topo) || (a.esq - b.esq));
+
+                    const grupos = [];
+                    for (let i = 0; i < campos.length; i++) {
+                        const atual = grupos[grupos.length - 1];
+                        if (atual && Math.abs(campos[i].topo - atual[0].topo) <= 12) atual.push(campos[i]);
+                        else grupos.push([campos[i]]);
+                    }
+
+                    const linhas = [];
+                    for (let i = 0; i < grupos.length; i++) {
+                        const g = grupos[i];
+                        if (g.length < 2) continue;
+                        const quantidade = g[g.length - 1].el;
+                        const v = (quantidade.value || '').trim();
+                        if (!/^\d{0,3}$/.test(v)) continue;
+                        linhas.push({
+                            cod: g[0].el,
+                            desc: g.length >= 3 ? g[g.length - 2].el : null,
+                            qtd: quantidade,
+                            topo: g[0].topo
+                        });
+                    }
+                    linhas.sort((a, b) => a.topo - b.topo);
+                    return linhas;
+                };
+
+                const proximaLinhaLivre = () => {
+                    const linhas = linhasDeProcedimento();
+                    for (let i = 0; i < linhas.length; i++) {
+                        if (!(linhas[i].cod.value || '').trim()) return linhas[i];
+                    }
+                    return null;
+                };
+
+                const anotarFalha = (cod, motivo) => {
+                    if (!cod || naoEntraram.indexOf(cod) !== -1) return;
+                    naoEntraram.push(cod);
+                    const linhas = linhasDeProcedimento();
+                    diagnostico.push({
+                        codigo: cod,
+                        motivo: motivo,
+                        linhasNaTela: linhas.length,
+                        linhasLivres: linhas.filter(l => !(l.cod.value || '').trim()).length,
+                        temBotaoAdicionar: !!botaoAdicionar()
+                    });
+                };
+
+                // Digita o código e SAI do campo. É a saída do campo que faz o
+                // portal ir buscar a descrição.
+                const digitarCodigo = (campo, valor) => {
+                    try { campo.focus(); } catch (e) { }
+                    campo.value = valor;
+                    campo.dispatchEvent(new Event('input', { bubbles: true }));
+                    campo.dispatchEvent(new Event('change', { bubbles: true }));
+                    campo.dispatchEvent(new KeyboardEvent('keyup', { key: 'Enter', keyCode: 13, which: 13, bubbles: true }));
+                    campo.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+                    try { campo.blur(); } catch (e) { }
+                    campo.dispatchEvent(new Event('blur', { bubbles: false }));
+                };
+
+                const ajustarQuantidade = (linha, quantidade) => {
+                    const campo = linha.qtd;
+                    if (!campo) return;
+                    try { campo.focus(); } catch (e) { }
+                    campo.value = String(quantidade);
+                    campo.dispatchEvent(new Event('input', { bubbles: true }));
+                    campo.dispatchEvent(new Event('change', { bubbles: true }));
+                    campo.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+                    try { campo.blur(); } catch (e) { }
+                };
+
+                const limparLinha = linha => {
+                    try {
+                        linha.cod.value = '';
+                        linha.cod.dispatchEvent(new Event('input', { bubbles: true }));
+                        linha.cod.dispatchEvent(new Event('change', { bubbles: true }));
+                    } catch (e) { }
+                };
+
+                const esperarDescricao = (linha, item) => {
+                    const inicio = Date.now();
+                    if (vigia) clearInterval(vigia);
+                    vigia = setInterval(() => {
+                        if (finalizado) { clearInterval(vigia); vigia = null; return; }
+                        if (pausado) return;
+                        const desc = linha.desc ? (linha.desc.value || '').trim() : '';
+                        if (desc.length > 2) {
+                            clearInterval(vigia); vigia = null;
+                            colocados++;
+                            if (item.qtd > 1) ajustarQuantidade(linha, item.qtd);
+                            avancar();
+                            return;
+                        }
+                        if (Date.now() - inicio > ESPERA_DESCRICAO) {
+                            clearInterval(vigia); vigia = null;
+                            const aindaLa = (linha.cod.value || '').trim() === item.cod;
+                            anotarFalha(item.cod, aindaLa ? 'o portal nao trouxe a descricao' : 'o portal limpou o codigo');
+                            limparLinha(linha);
+                            setStatus('o portal nao aceitou ' + item.cod + ' - seguindo');
+                            avancar();
+                        }
+                    }, 300);
+                };
+
+                const processar = () => {
+                    if (finalizado || pausado || trabalhando) return;
+                    if (idx >= codigos.length) { finalizar(); return; }
+                    const item = codigos[idx];
+                    const linha = proximaLinhaLivre();
+                    if (!linha) {
+                        const botao = botaoAdicionar();
+                        if (!botao || tentativasLinha > 6) {
+                            anotarFalha(item.cod, botao ? 'a linha nova nao apareceu' : 'nao achei o botao de adicionar linha');
+                            tentativasLinha = 0;
+                            avancar();
+                            return;
+                        }
+                        tentativasLinha++;
+                        setStatus('abrindo mais uma linha');
+                        try { botao.click(); } catch (e) { }
+                        setTimeout(processar, 500);
+                        return;
+                    }
+                    tentativasLinha = 0;
+                    trabalhando = true;
+                    passoAtual = idx;
+                    passoDesde = Date.now();
+                    setStatus('lancando ' + item.cod);
+                    setContador();
+                    digitarCodigo(linha.cod, item.cod);
+                    esperarDescricao(linha, item);
+                };
+
+                const avancar = () => {
+                    trabalhando = false;
+                    idx++;
+                    passoAtual = idx;
+                    passoDesde = Date.now();
+                    setContador();
+                    if (idx >= codigos.length) { finalizar(); return; }
+                    setTimeout(processar, 250);
+                };
+
+                // Rede de segurança: nenhum código segura a fila para sempre.
+                const iniciarMarcaPasso = () => {
+                    if (marcaPasso) clearInterval(marcaPasso);
+                    passoAtual = idx;
+                    passoDesde = Date.now();
+                    marcaPasso = setInterval(() => {
+                        if (finalizado) { clearInterval(marcaPasso); marcaPasso = null; return; }
+                        if (pausado) { passoDesde = Date.now(); return; }
+                        if (idx >= codigos.length) { finalizar(); return; }
+                        if (idx !== passoAtual) { passoAtual = idx; passoDesde = Date.now(); return; }
+                        if (Date.now() - passoDesde < LIMITE_DO_PASSO) return;
+                        if (vigia) { clearInterval(vigia); vigia = null; }
+                        anotarFalha((codigos[idx] || {}).cod, 'demorou demais e foi pulado');
+                        setStatus('destravando');
+                        avancar();
+                    }, 2000);
+                };
+
+                const togglePause = () => {
+                    pausado = !pausado;
+                    passoDesde = Date.now();
+                    setStatus(pausado ? 'pausado' : 'retomado');
+                    if (!pausado) processar();
+                };
+
+                const pular = () => {
+                    if (vigia) { clearInterval(vigia); vigia = null; }
+                    avancar();
+                };
+
+                const finalizar = () => {
+                    if (finalizado) return;
+                    finalizado = true;
+                    pausado = true;
+                    trabalhando = false;
+                    if (vigia) { clearInterval(vigia); vigia = null; }
+                    if (marcaPasso) { clearInterval(marcaPasso); marcaPasso = null; }
+                    if (naoEntraram.length) {
+                        const d = diagnostico[0] || {};
+                        setStatus('⚠️ FIM — ' + colocados + ' de ' + codigos.length +
+                            ' entraram. NAO ENTRARAM: ' + naoEntraram.join(', ') +
+                            ' (lance a mao) | ' + (d.motivo || ''));
+                        try {
+                            window.__sampDiagnostico = diagnostico;
+                            console.warn('[SAMP] Codigos que o portal nao aceitou:', naoEntraram.join(', '));
+                            console.warn('[SAMP] O que a tela mostrava na hora:', diagnostico);
+                        } catch (e) { }
+                    } else {
+                        setStatus('finalizado');
+                    }
+                    try {
+                        if (painel) {
+                            const btnFechar = document.createElement('button');
+                            btnFechar.textContent = '🧹 Fechar painel';
+                            btnFechar.style = 'margin-top:10px;width:100%;padding:8px;border:none;border-radius:8px;background:#444;color:#fff;cursor:pointer;';
+                            btnFechar.onclick = () => { if (painel) painel.remove(); painel = null; };
+                            painel.appendChild(btnFechar);
+                        }
+                    } catch (e) { }
+                };
+
+                const iniciarAutomacao = () => {
+                    const texto = painel.querySelector('#samp-input').value || '';
+                    const achados = texto.match(/\b\d{8}\b/g) || [];
+                    if (!achados.length) { alert('Nenhum código válido.'); return; }
+                    // Mantém a ordem em que os códigos foram colados e conta as
+                    // repetições. A lista é montada percorrendo o texto, nunca
+                    // pelas chaves de um objeto, que o JavaScript reordena.
+                    const contagem = {};
+                    const ordem = [];
+                    for (let i = 0; i < achados.length; i++) {
+                        const c = achados[i];
+                        if (contagem[c] === undefined) { contagem[c] = 0; ordem.push(c); }
+                        contagem[c]++;
+                    }
+                    codigos = ordem.map(c => ({ cod: c, qtd: contagem[c] }));
+                    painel.innerHTML = '<div style="font-weight:600;margin-bottom:10px;">🩹 SAMP AGMP</div>' +
+                        '<div id="samp-status">Status: iniciado</div>' +
+                        '<div id="samp-contador">0 / ' + codigos.length + '</div>' +
+                        '<div style="margin-top:10px;display:grid;grid-template-columns:1fr 1fr;gap:6px;">' +
+                        '<button id="samp-pausar">⏸ Pausar</button>' +
+                        '<button id="samp-pular">⏭ Pular</button>' +
+                        '<button id="samp-encerrar" style="grid-column:1/3;">❌ Encerrar</button></div>';
+                    statusEl = painel.querySelector('#samp-status');
+                    contadorEl = painel.querySelector('#samp-contador');
+                    painel.querySelector('#samp-pausar').onclick = togglePause;
+                    painel.querySelector('#samp-pular').onclick = pular;
+                    painel.querySelector('#samp-encerrar').onclick = finalizar;
+                    iniciarMarcaPasso();
+                    processar();
+                };
+
+                const criarPainelEntrada = () => {
+                    painel = document.createElement('div');
+                    painel.id = 'samp-painel-root';
+                    painel.style = 'position:fixed;bottom:20px;right:20px;z-index:999999;background:#1e1e1e;color:#f1f1f1;font-family:system-ui,Arial;padding:14px;border-radius:12px;box-shadow:0 8px 24px rgba(0,0,0,.4);width:260px;';
+                    painel.innerHTML = '<div style="font-weight:600;margin-bottom:8px;">🩹 SAMP AGMP</div>' +
+                        '<textarea id="samp-input" placeholder="Cole os códigos (8 dígitos) aqui..." style="width:100%;height:80px;border-radius:6px;border:none;padding:6px;margin-bottom:8px;"></textarea>' +
+                        '<button id="samp-iniciar" style="width:100%;padding:8px;border:none;border-radius:8px;background:#2d7dff;color:#fff;cursor:pointer;">▶️ Iniciar</button>';
+                    document.body.appendChild(painel);
+                    painel.querySelector('#samp-iniciar').onclick = iniciarAutomacao;
+                };
+
+                criarPainelEntrada();
+            })();
+        },
     };
     // ── FICHA DE CADA CONVÊNIO (ícone, cor, descrição, modo de entrega) ──
     const infoRobos = {
@@ -4187,6 +4516,7 @@
         "PLENUM":           { icone: "⚖️", cor: "#8e44ad", desc: "Automação para Convênios de Advocacia e Justiça",modo: "painel", txt: "plenum-txt",    btn: "plenum-btn" },
         "PM/STJ":           { icone: "🛡️", cor: "#5dade2", desc: "Automação para Segurança e Justiça Superior",    modo: "prompt" },
         "POSTAL":           { icone: "✉️", cor: "#d4ac0d", desc: "Automação para Logística Postal",                modo: "prompt" },
+        "SAMP":             { icone: "🩹", cor: "#c62828", desc: "Automação para Convênio SAMP AGMP",             modo: "painel", txt: "samp-input",     btn: "samp-iniciar" },
         "SULAMERICA":       { icone: "🌎", cor: "#e74c3c", desc: "Automação para Convênios Sulamerica",            modo: "prompt" },
         "TJDF":             { icone: "🏛️", cor: "#e67e22", desc: "Automação para Tribunal de Justiça do DF",       modo: "painel", txt: "b403-input",    btn: "b403-iniciar" },
         "TRE":              { icone: "🗳️", cor: "#7f9fc4", desc: "Automação para Tribunal Regional Eleitoral",     modo: "prompt" },
@@ -4204,12 +4534,14 @@
         "MEDSENIOR/UN SEG": "statusLog",
         "PLANASSISTE MPU": "rs",
         "PLENUM": "plenum-status",
+        "SAMP": "samp-status",
         "TJDF": "b403-status",
         "TRT": "g-status"
     };
 
     // Robôs cujo contador fica num elemento separado do status
     const contadorRobo = {
+        "SAMP": "samp-contador",
         "TJDF": "b403-contador"
     };
 
@@ -5881,6 +6213,7 @@
 
     // ── LOGOTIPOS DOS CONVÊNIOS (embutidos, não dependem de internet) ──
     const LOGOS = {
+        "SAMP AGMP": "data:image/webp;base64,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",
         "Assefaz": "data:image/webp;base64,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",
         "BRB Saúde": "data:image/webp;base64,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",
         "Câmara dos Deputados": "data:image/webp;base64,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",
@@ -5961,6 +6294,7 @@
         { rotulo: "PM",                chave: "PM/STJ",           icone: "🛡️", cor: "#5dade2", desc: "Automação para Polícia Militar" },
         { rotulo: "Postal (Correios)", chave: "POSTAL",           icone: "✉️", cor: "#d4ac0d", desc: "Automação para Logística Postal" },
         { rotulo: "Proasa",            chave: "CNU UNIMED",       icone: "🧪", cor: "#2e86c1", desc: "Automação para Autorizações Proasa" },
+        { rotulo: "SAMP AGMP",         chave: "SAMP",             icone: "🩹", cor: "#c62828", desc: "Automação para Convênio SAMP AGMP" },
         { rotulo: "Serpro",            chave: "ASSEFAZ",          icone: "💻", cor: "#1f3fa8", desc: "Automação para Convênios Serpro" },
         { rotulo: "STJ",               chave: "PM/STJ",           icone: "🏛️", cor: "#4a90d9", desc: "Automação para Superior Tribunal de Justiça" },
         { rotulo: "STM",               chave: "ASSEFAZ",          icone: "⚖️", cor: "#8b1a1a", desc: "Automação para Convênio STM (Plas/JMU)" },
