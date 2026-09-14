@@ -85,6 +85,12 @@
   .how b{color:#1e7e34;}
   .divider{height:1px;background:#e7ebf1;margin:6px 0 18px;}
   .footer{text-align:center;font-size:.78rem;color:#9aa4b2;}
+  .cod{width:100%;height:86px;margin-top:10px;padding:10px;border:1px solid #d7dee8;
+       border-radius:10px;background:#f7f9fc;color:#4b5563;
+       font-family:Consolas,monospace;font-size:.72rem;resize:vertical;}
+  .copiar{margin-top:9px;padding:9px 18px;border:none;border-radius:9px;background:#2d7dff;
+          color:#fff;font-size:.88rem;font-weight:700;cursor:pointer;}
+  .copiar:hover{filter:brightness(1.07);}
 </style>
 </head>
 <body>
@@ -92,7 +98,7 @@
     <div class="header">
       <div class="icon">🤖</div>
       <h1>Central de Automação</h1>
-      <p>Instale em 1 minuto · Sabin Brasília</p>
+      <p>Instale em 1 minuto · Chrome, Edge e Firefox · Sabin Brasília</p>
     </div>
 
     <div class="body">
@@ -101,7 +107,7 @@
         <div class="num">1</div>
         <div class="step-content">
           <h3>Mostre a barra de favoritos</h3>
-          <p>Pressione <b>Ctrl + Shift + B</b> no Chrome para exibir a barra de favoritos.</p>
+          <p>Pressione <b>Ctrl + Shift + B</b> para exibir a barra de favoritos. O atalho é o mesmo nos três navegadores. No Firefox, se a barra sumir ao trocar de aba, clique com o botão direito nela e escolha <b>Sempre exibir</b>.</p>
         </div>
       </div>
 
@@ -110,11 +116,11 @@
         <div class="num">2</div>
         <div class="step-content">
           <h3>Arraste o botão para a barra de favoritos</h3>
-          <p>Segure o botão abaixo com o mouse e arraste até a barra no topo do Chrome.</p>
+          <p>Segure o botão abaixo com o mouse e arraste até a barra no topo do navegador. Funciona no Chrome, no Edge e no Firefox. No Firefox aparece uma caixinha de confirmação já preenchida: é só clicar em <b>Salvar</b>.</p>
           <div class="drag-area">
             <p class="drag-label">⬇ Arraste este botão para a barra de favoritos ⬇</p>
             <a class="bm"
-               href="javascript:(function()%7Bfetch('https://raw.githubusercontent.com/sandrolimadf1984/central-robos/main/central.js?v='+Date.now()).then(r=%3E%7Bif(!r.ok)throw new Error('Erro ao carregar!');return r.text()%7D).then(c=%3Eeval(c)).catch(e=%3Ealert(e.message));%7D)();"
+               href="javascript:(function () { if (document.getElementById('menu-central-robos')) return; if (window.__crCarregando) return; window.__crCarregando = 1; var v = Date.now(); var RAW = 'https://raw.githubusercontent.com/sandrolimadf1984/central-robos/main/central.js?v=' + v; var PAGES = 'https://sandrolimadf1984.github.io/central-robos/central.js?v=' + v; var CDN = 'https://cdn.jsdelivr.net/gh/sandrolimadf1984/central-robos@main/central.js'; var AJUDA = 'https://sandrolimadf1984.github.io/central-robos/carregar.html?v=' + v; var ORIGEM_AJUDA = 'https://sandrolimadf1984.github.io'; var erros = []; var passo = 0; var caminhos = []; function fim() { window.__crCarregando = 0; } function abriu() { return !!document.getElementById('menu-central-robos'); } function seguir() { if (abriu()) { fim(); return; } if (passo >= caminhos.length) { desistir(); return; } var f = caminhos[passo++]; try { f(); } catch (e) { erros.push('erro inesperado: ' + e.message); seguir(); } } function executar(codigo, origem) { try { eval(codigo); } catch (e) { erros.push(origem + ': nao executou -> ' + e.message); seguir(); return; } if (abriu()) fim(); else { erros.push(origem + ': executou mas a Central nao abriu'); seguir(); } } function desistir() { fim(); alert('Nao consegui abrir a Central de Automacao nesta pagina.\n\n' + 'O que eu tentei:\n- ' + erros.join('\n- ') + '\n\nMande este texto para o Sandro.'); } function chaveDaPagina() { try { var ss = document.querySelectorAll('script'); for (var i = 0; i < ss.length; i++) { var n = ss[i].nonce || ss[i].getAttribute('nonce'); if (n) return n; } } catch (e) { } return ''; } function porTag(url, nome) { return function () { var s = document.createElement('script'); var chave = chaveDaPagina(); if (chave) { try { s.nonce = chave; s.setAttribute('nonce', chave); } catch (e) { } } s.onload = function () { s.remove(); if (abriu()) fim(); else { erros.push(nome + ': carregou mas a Central nao abriu'); seguir(); } }; s.onerror = function () { s.remove(); erros.push(nome + ': bloqueado' + (chave ? ' (mesmo levando a chave da pagina)' : ' (a pagina nao me deu chave)')); seguir(); }; s.src = url; (document.head || document.documentElement).appendChild(s); }; } function porBusca(usarXHR) { return function () { var nome = usarXHR ? 'busca antiga' : 'busca direta'; if (!usarXHR) { try { fetch(RAW).then(function (r) { if (!r.ok) throw new Error('resposta ' + r.status); return r.text(); }).then(function (c) { executar(c, nome); }) .catch(function (e) { erros.push(nome + ': ' + e.message); seguir(); }); } catch (e) { erros.push(nome + ': ' + e.message); seguir(); } return; } try { var x = new XMLHttpRequest(); x.open('GET', RAW, true); x.onload = function () { if (x.status === 200) executar(x.responseText, nome); else { erros.push(nome + ': resposta ' + x.status); seguir(); } }; x.onerror = function () { erros.push(nome + ': bloqueada'); seguir(); }; x.send(); } catch (e) { erros.push(nome + ': ' + e.message); seguir(); } }; } function porJanela() { var janela = null; var respondeu = false; function ouvir(ev) { if (ev.origin !== ORIGEM_AJUDA) return; var d = ev.data || {}; if (d.tipo !== 'central-robos' && d.tipo !== 'central-robos-erro') return; respondeu = true; window.removeEventListener('message', ouvir); try { if (janela) janela.close(); } catch (e) { } if (d.tipo === 'central-robos' && typeof d.codigo === 'string' && d.codigo.length > 1000) { executar(d.codigo, 'janela auxiliar'); } else { erros.push('janela auxiliar: ' + (d.erro || 'veio vazio')); seguir(); } } window.addEventListener('message', ouvir); try { janela = window.open(AJUDA, 'crAjuda', 'width=420,height=200'); } catch (e) { janela = null; } if (!janela) { window.removeEventListener('message', ouvir); erros.push('janela auxiliar: o navegador nao deixou abrir'); seguir(); return; } setTimeout(function () { if (respondeu) return; window.removeEventListener('message', ouvir); try { janela.close(); } catch (e) { } erros.push('janela auxiliar: sem resposta a tempo'); seguir(); }, 15000); } caminhos = [ porBusca(false), porBusca(true), porTag(PAGES, 'script do GitHub'), porTag(CDN, 'script do espelho'), porJanela ]; seguir(); })();"
                onclick="alert('👆 Não clique aqui! ARRASTE este botão para a barra de favoritos.'); return false;">🤖 Robôs</a>
             <p class="hint">🖱️ Clique e segure → arraste para cima até a barra</p>
           </div>
@@ -136,9 +142,34 @@
         </div>
       </div>
 
+      <!-- Passo 4 -->
+      <div class="step">
+        <div class="num">4</div>
+        <div class="step-content">
+          <h3>Já tem o favorito Robôs? Não precisa criar outro</h3>
+          <p>Clique em <b>Copiar código</b>, depois clique com o botão direito no favorito
+          <b>Robôs</b> que você já tem, escolha <b>Editar</b>, apague o endereço antigo e cole o
+          novo. Ele continua no mesmo lugar, com o mesmo nome.</p>
+          <p>Se preferir criar do zero: no Firefox, botão direito na barra de favoritos e
+          <b>Adicionar favorito</b>, preenchendo nome e endereço. No Chrome e no Edge,
+          <b>Ctrl + D</b> em qualquer página, salvar, e depois <b>Editar</b> para trocar o endereço.</p>
+          <textarea class="cod" id="cod" readonly spellcheck="false">javascript:(function () { if (document.getElementById('menu-central-robos')) return; if (window.__crCarregando) return; window.__crCarregando = 1; var v = Date.now(); var RAW = 'https://raw.githubusercontent.com/sandrolimadf1984/central-robos/main/central.js?v=' + v; var PAGES = 'https://sandrolimadf1984.github.io/central-robos/central.js?v=' + v; var CDN = 'https://cdn.jsdelivr.net/gh/sandrolimadf1984/central-robos@main/central.js'; var AJUDA = 'https://sandrolimadf1984.github.io/central-robos/carregar.html?v=' + v; var ORIGEM_AJUDA = 'https://sandrolimadf1984.github.io'; var erros = []; var passo = 0; var caminhos = []; function fim() { window.__crCarregando = 0; } function abriu() { return !!document.getElementById('menu-central-robos'); } function seguir() { if (abriu()) { fim(); return; } if (passo >= caminhos.length) { desistir(); return; } var f = caminhos[passo++]; try { f(); } catch (e) { erros.push('erro inesperado: ' + e.message); seguir(); } } function executar(codigo, origem) { try { eval(codigo); } catch (e) { erros.push(origem + ': nao executou -> ' + e.message); seguir(); return; } if (abriu()) fim(); else { erros.push(origem + ': executou mas a Central nao abriu'); seguir(); } } function desistir() { fim(); alert('Nao consegui abrir a Central de Automacao nesta pagina.\n\n' + 'O que eu tentei:\n- ' + erros.join('\n- ') + '\n\nMande este texto para o Sandro.'); } function chaveDaPagina() { try { var ss = document.querySelectorAll('script'); for (var i = 0; i &lt; ss.length; i++) { var n = ss[i].nonce || ss[i].getAttribute('nonce'); if (n) return n; } } catch (e) { } return ''; } function porTag(url, nome) { return function () { var s = document.createElement('script'); var chave = chaveDaPagina(); if (chave) { try { s.nonce = chave; s.setAttribute('nonce', chave); } catch (e) { } } s.onload = function () { s.remove(); if (abriu()) fim(); else { erros.push(nome + ': carregou mas a Central nao abriu'); seguir(); } }; s.onerror = function () { s.remove(); erros.push(nome + ': bloqueado' + (chave ? ' (mesmo levando a chave da pagina)' : ' (a pagina nao me deu chave)')); seguir(); }; s.src = url; (document.head || document.documentElement).appendChild(s); }; } function porBusca(usarXHR) { return function () { var nome = usarXHR ? 'busca antiga' : 'busca direta'; if (!usarXHR) { try { fetch(RAW).then(function (r) { if (!r.ok) throw new Error('resposta ' + r.status); return r.text(); }).then(function (c) { executar(c, nome); }) .catch(function (e) { erros.push(nome + ': ' + e.message); seguir(); }); } catch (e) { erros.push(nome + ': ' + e.message); seguir(); } return; } try { var x = new XMLHttpRequest(); x.open('GET', RAW, true); x.onload = function () { if (x.status === 200) executar(x.responseText, nome); else { erros.push(nome + ': resposta ' + x.status); seguir(); } }; x.onerror = function () { erros.push(nome + ': bloqueada'); seguir(); }; x.send(); } catch (e) { erros.push(nome + ': ' + e.message); seguir(); } }; } function porJanela() { var janela = null; var respondeu = false; function ouvir(ev) { if (ev.origin !== ORIGEM_AJUDA) return; var d = ev.data || {}; if (d.tipo !== 'central-robos' &amp;&amp; d.tipo !== 'central-robos-erro') return; respondeu = true; window.removeEventListener('message', ouvir); try { if (janela) janela.close(); } catch (e) { } if (d.tipo === 'central-robos' &amp;&amp; typeof d.codigo === 'string' &amp;&amp; d.codigo.length > 1000) { executar(d.codigo, 'janela auxiliar'); } else { erros.push('janela auxiliar: ' + (d.erro || 'veio vazio')); seguir(); } } window.addEventListener('message', ouvir); try { janela = window.open(AJUDA, 'crAjuda', 'width=420,height=200'); } catch (e) { janela = null; } if (!janela) { window.removeEventListener('message', ouvir); erros.push('janela auxiliar: o navegador nao deixou abrir'); seguir(); return; } setTimeout(function () { if (respondeu) return; window.removeEventListener('message', ouvir); try { janela.close(); } catch (e) { } erros.push('janela auxiliar: sem resposta a tempo'); seguir(); }, 15000); } caminhos = [ porBusca(false), porBusca(true), porTag(PAGES, 'script do GitHub'), porTag(CDN, 'script do espelho'), porJanela ]; seguir(); })();</textarea>
+          <button class="copiar" id="btnCopiar">Copiar código</button>
+        </div>
+      </div>
+
       <div class="divider"></div>
       <div class="footer">Desenvolvido para uso interno · Sabin Brasília</div>
     </div>
   </div>
+<script>
+  document.getElementById('btnCopiar').addEventListener('click', function () {
+    var c = document.getElementById('cod');
+    c.focus(); c.select();
+    var ok = false;
+    try { ok = document.execCommand('copy'); } catch (e) { ok = false; }
+    this.textContent = ok ? 'Copiado' : 'Use Ctrl+C agora';
+  });
+</script>
 </body>
 </html>
