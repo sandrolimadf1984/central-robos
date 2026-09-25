@@ -1,94 +1,93 @@
-(() => {
-    // ═══════════════════════════════════════════════════════════════════
-    //  CENTRAL DE AUTOMAÇÃO — BLOQUEADA TEMPORARIAMENTE
-    //
-    //  Este arquivo substitui o central.js de verdade enquanto a
-    //  ferramenta estiver fora do ar. Quem clicar no favorito Robôs vai
-    //  ver apenas o recado abaixo, em qualquer convênio.
-    //
-    //  PARA MUDAR O RECADO: altere as três linhas logo abaixo.
-    //  PARA LIBERAR DE NOVO: cole o conteúdo do central.js que funciona
-    //  por cima deste arquivo, no GitHub. Volta na hora para todo mundo.
-    // ═══════════════════════════════════════════════════════════════════
+// ==========================================
+// CENTRAL DE AUTOMAÇÃO - CLTZINHO DIGITAL
+// Criado por Sandro de Lima Pereira
+// ==========================================
 
-    const TITULO = 'Central de Automação indisponível';
-    const RECADO = 'A ferramenta está temporariamente fora do ar para manutenção.';
-    const RODAPE = 'Por enquanto, lance os códigos manualmente. Avisaremos quando voltar.';
+// Função que exibe exatamente o pop-up da imagem anexada
+function mostrarAvisoManutencao() {
+    // Remove qualquer modal duplicado se já existir na tela
+    const modalAntigo = document.getElementById('cr-modal-bloqueio');
+    if (modalAntigo) modalAntigo.remove();
 
-    // Se o aviso já estiver na tela, não abre outro.
-    if (document.getElementById('cr-bloqueio')) return;
+    // Cria o container escurecido de fundo (overlay)
+    const modal = document.createElement('div');
+    modal.id = 'cr-modal-bloqueio';
+    modal.style.cssText = `
+        position: fixed; top: 0; left: 0; width: 100vw; height: 100vh;
+        background: rgba(0, 0, 0, 0.75); z-index: 2147483647;
+        display: flex; align-items: center; justify-content: center;
+        font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    `;
 
-    const caixa = document.createElement('div');
-    caixa.id = 'cr-bloqueio';
-    caixa.style.cssText = [
-        'position:fixed',
-        'top:50%',
-        'left:50%',
-        'transform:translate(-50%,-50%)',
-        'z-index:2147483647',
-        'width:360px',
-        'max-width:92vw',
-        'background:#1e2127',
-        'color:#e9edf2',
-        'font-family:system-ui,-apple-system,Segoe UI,Arial,sans-serif',
-        'font-size:15px',
-        'line-height:1.55',
-        'padding:24px 22px 20px',
-        'border-radius:14px',
-        'border:1px solid #3a4150',
-        'box-shadow:0 18px 50px rgba(0,0,0,.55)',
-        'text-align:center'
-    ].join(';');
+    // Cria o card interno com o mesmo layout da imagem
+    modal.innerHTML = `
+        <div style="background: #181b22; border: 1px solid #2a2e39; border-radius: 16px; padding: 32px 28px; width: 380px; text-align: center; box-shadow: 0 12px 35px rgba(0,0,0,0.6); color: #ffffff;">
+            
+            <!-- Ícone de Cadeado -->
+            <div style="margin-bottom: 20px; display: flex; justify-content: center;">
+                <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="url(#cadeado-grad)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <defs>
+                        <linearGradient id="cadeado-grad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stop-color="#ffcc00"/>
+                            <stop offset="100%" stop-color="#ff8800"/>
+                        </linearGradient>
+                    </defs>
+                    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" fill="#ffaa00" fill-opacity="0.15"></rect>
+                    <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    <circle cx="12" cy="16" r="1.5" fill="#ffaa00"></circle>
+                </svg>
+            </div>
 
-    const icone = document.createElement('div');
-    icone.textContent = '🔒';
-    icone.style.cssText = 'font-size:38px;line-height:1;margin-bottom:12px;';
+            <!-- Título Principal -->
+            <div style="font-size: 19px; font-weight: 700; color: #ffffff; margin-bottom: 12px; letter-spacing: -0.2px;">
+                Central de Automação indisponível
+            </div>
 
-    const titulo = document.createElement('div');
-    titulo.textContent = TITULO;
-    titulo.style.cssText = 'font-size:18px;font-weight:600;margin-bottom:10px;';
+            <!-- Descrição Principal -->
+            <div style="font-size: 14px; color: #b0b8c4; margin-bottom: 18px; line-height: 1.5;">
+                A ferramenta está temporariamente fora do ar para manutenção.
+            </div>
 
-    const recado = document.createElement('div');
-    recado.textContent = RECADO;
-    recado.style.cssText = 'margin-bottom:10px;';
+            <!-- Mensagem Secundária -->
+            <div style="font-size: 12px; color: #6e7681; margin-bottom: 28px; line-height: 1.5;">
+                Por enquanto, lance os códigos manualmente.<br>Avisaremos quando voltar.
+            </div>
 
-    const rodape = document.createElement('div');
-    rodape.textContent = RODAPE;
-    rodape.style.cssText = 'font-size:13px;color:#939dad;margin-bottom:18px;';
+            <!-- Botão Entendi -->
+            <button id="cr-btn-entendi" style="background: #2b6cb0; background: linear-gradient(180deg, #3182ce, #2b6cb0); color: #ffffff; border: none; border-radius: 10px; padding: 13px 0; font-weight: 600; cursor: pointer; font-size: 15px; width: 100%; box-shadow: 0 4px 12px rgba(49, 130, 206, 0.35); transition: background 0.2s;">
+                Entendi
+            </button>
+        </div>
+    `;
 
-    const botao = document.createElement('button');
-    botao.textContent = 'Entendi';
-    botao.style.cssText = [
-        'width:100%',
-        'padding:11px',
-        'border:none',
-        'border-radius:9px',
-        'background:#2d7dff',
-        'color:#fff',
-        'font-size:15px',
-        'font-weight:600',
-        'cursor:pointer'
-    ].join(';');
-    botao.onclick = () => { try { caixa.remove(); } catch (e) { } };
+    document.body.appendChild(modal);
 
-    caixa.appendChild(icone);
-    caixa.appendChild(titulo);
-    caixa.appendChild(recado);
-    caixa.appendChild(rodape);
-    caixa.appendChild(botao);
+    // Comportamento do botão: fecha e remove o aviso da tela imediatamente
+    document.getElementById('cr-btn-entendi').onclick = () => {
+        modal.remove();
+    };
 
-    try {
-        (document.body || document.documentElement).appendChild(caixa);
-    } catch (e) {
-        alert(TITULO + '\n\n' + RECADO);
-        return;
+    // Opcional: fechar também ao clicar no fundo escuro
+    modal.onclick = (e) => {
+        if (e.target === modal) modal.remove();
+    };
+}
+
+// Objeto de robôs configurados para acionar exclusivamente o bloqueio
+const robos = {
+    "Affego": mostrarAvisoManutencao,
+    "Amil": mostrarAvisoManutencao,
+    "AssedfVidacard": mostrarAvisoManutencao,
+    "Assefaz": mostrarAvisoManutencao,
+    "BrbSaude": mostrarAvisoManutencao,
+    "CamaraDeputados": mostrarAvisoManutencao
+};
+
+// Interceptação dinâmica global para garantir que qualquer outro robô cadastrado seja bloqueado da mesma forma
+document.addEventListener("DOMContentLoaded", () => {
+    if (typeof window.robos === 'object' && window.robos !== null) {
+        Object.keys(window.robos).forEach(chave => {
+            window.robos[chave] = mostrarAvisoManutencao;
+        });
     }
-
-    // Some sozinho depois de um tempo, para não ficar atrapalhando a tela
-    // caso a pessoa não clique em nada.
-    setTimeout(() => { try { caixa.remove(); } catch (e) { } }, 25000);
-
-    try {
-        console.warn('[Central de Automação] Ferramenta bloqueada temporariamente.');
-    } catch (e) { }
-})();
+});
